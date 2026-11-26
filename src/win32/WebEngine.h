@@ -5,6 +5,8 @@
 #endif
 #include <windows.h>
 
+#include "../common/Translation.h"
+
 #include <functional>
 #include <string>
 #include <utility>
@@ -24,6 +26,10 @@ public:
     void reload();
     void focus();
     void resize(int width, int height);
+    void setVisible(bool visible);
+
+    // One-shot, offline page translation. No observers or timers are installed.
+    void translate(translation::Direction direction);
 
     void setOnReload(std::function<void()> callback) {
         onReload_ = std::move(callback);

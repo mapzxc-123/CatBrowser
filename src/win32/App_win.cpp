@@ -1,5 +1,6 @@
 #include "../App.h"
 #include "../common/Log.h"
+#include "../common/Translation.h"
 #include "PlatformWindow.h"
 #include "WebEngine.h"
 
@@ -29,6 +30,14 @@ int runPlatform(const AppConfig& config) {
     window.setOnReload([&] { engine.reload(); });
     window.setOnResize([&](int width, int height) {
         engine.resize(width, height);
+    });
+    window.setOnTranslate([&](bool toJapanese) {
+        // One-shot, offline dictionary pass. No timers, no observers, no network.
+        engine.translate(toJapanese ? translation::Direction::ToJapanese
+                                    : translation::Direction::ToEnglish);
+    });
+    window.setOnVisibility([&](bool visible) {
+        engine.setVisible(visible);
     });
 
     engine.setOnReload([&] { engine.reload(); });

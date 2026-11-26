@@ -4,12 +4,21 @@
 Electron / Tauri / Chromium の自前ビルドは使用せず、各 OS のネイティブ API と
 OS 標準の WebView エンジンを直接制御します。
 
+**バージョン 1.3** ではオフラインのページ翻訳、アイドル時の完全な処理停止、
+フォントと UI の改善を行いました。1.2 の exe は `artifacts/windows/CatBrowser-1.2.exe`
+およびタグ `v1.2` に残しています。
+
 > **現在の優先順位: Windows のみ。** macOS / Linux のソースは将来用に残していますが、
 > 既定ではビルド対象外です（後回し）。Windows の完成・検証を優先しています。
 
 ## 機能
 
-- 上部 URL バー（30 px）＋ `GO` ボタン＋ WebView 領域のみの最小 UI
+- 上部 URL バー（32 px）＋ `訳` / 方向切替 / `GO` ボタン＋ WebView 領域のみの最小 UI
+- `訳` ボタン: 表示中のページ全体を**内蔵辞書で完全オフライン翻訳**。
+  押したときだけ 1 回スクリプトを実行し、監視・タイマー・通信は一切ありません
+- 方向切替ボタン: `→JA`（英語→日本語）/ `→EN`（日本語→英語）を切り替え
+- 再翻訳時は前回の置換を元に戻してから実行するため、二重翻訳されません
+- 何も操作していないとき（非アクティブ・最小化）は WebView を非表示にして描画処理を停止
 - 入力は `http://` / `https://` のみ。スキーム省略時は `https://` を補完します
 - スペース・引用符・`javascript:` / `file:` / `data:` などのスキームは入力段階で拒否。
   検索エンジンへのリダイレクトはコード上存在しません
@@ -28,11 +37,13 @@ src/
   App.h                    プラットフォーム共通インターフェース
   common/
     UrlUtils.*             http(s) のみの URL 正規化
+    Translation.*          オフライン EN<->JA 辞書と一回限りの翻訳スクリプト
     Text.h                 UTF-8 <-> UTF-16 (Win32)
     Log.*
   win32/
     PlatformWindow.*       Win32 ウィンドウ / URL バー / 全画面
     WebEngine.*            WebView2 起動・設定・入力
+    Version.rc.in          exe のバージョン情報 (1.3)
     App_win.cpp            優先度設定と配線
     GpuExports.cpp         NVIDIA / AMD の GPU 強制エクスポート
   mac/
@@ -94,7 +105,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 
 | OS | 設定 |
 |---|---|
-| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`（システム全体を遅くしない範囲）、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化 |
+| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`（システム全体を遅くしない範囲）、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止 |
 | macOS | `NSActivityUserInitiated \| NSActivityLatencyCritical` で App Nap 無効、`nonPersistentDataStore`、`WKPreferences` の `_acceleratedDrawingEnabled` / `_webGLEnabled` / `_canvasUsesAcceleratedDrawing` を KVC で有効化、レイヤーバックトビュー |
 | Linux | `setpriority(PRIO_PROCESS, 0, -10)`、ephemeral `WebKitWebContext`、`enable-webgl` / `enable-accelerated-2d-canvas` / `hardware-acceleration-policy=ALWAYS` |
 
@@ -107,6 +118,9 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
   Runtime のバージョンによっては無視されます。
 - `--disable-frame-rate-limit` や背景スロットリング無効化は「重い」原因になるため
   意図的に外しています。GPU 加速は `ignore-gpu-blocklist` / `use-angle=d3d11` で維持します。
+- 内蔵辞書はゲーム UI の定型句が中心です。未知の文章は翻訳されませんが、
+  通信も初期化も行わないため待機時は完全に無負荷です。
+- メッセージループは `GetMessageW` のブロック待ちで、アイドル時にタイマーは使いません。
 - `_acceleratedDrawingEnabled` などの WKPreferences キーは非公開 SPI です。
   macOS の更新で名前が変わった場合は `@try/@catch` により安全に無視されます。
 - Linux で nice 値を下げるには `CAP_SYS_NICE` または高い `RLIMIT_NICE` が必要です。

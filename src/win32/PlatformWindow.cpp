@@ -11,8 +11,12 @@ namespace {
 
 constexpr int kUrlBarHeight = 32;
 constexpr int kGoButtonWidth = 72;
+constexpr int kTranslateButtonWidth = 40;
+constexpr int kDirectionButtonWidth = 52;
 constexpr int kEditControlId = 100;
 constexpr int kGoButtonId = 101;
+constexpr int kTranslateButtonId = 102;
+constexpr int kDirectionButtonId = 103;
 
 // One launcher window per process; used only by the edit control subclass.
 PlatformWindow* g_activeWindow = nullptr;
@@ -121,12 +125,20 @@ void PlatformWindow::layout() {
 
     const int width = client.right;
     const int height = client.bottom;
-    const int barWidth = std::max(1, width - kGoButtonWidth);
+    const int fixedWidth = kGoButtonWidth + kTranslateButtonWidth +
+                           kDirectionButtonWidth;
+    const int barWidth = std::max(1, width - fixedWidth);
     const int webHeight = std::max(1, height - kUrlBarHeight);
 
     MoveWindow(urlEdit_, 0, 0, barWidth, kUrlBarHeight, TRUE);
-    MoveWindow(goButton_, width - kGoButtonWidth, 0,
-               kGoButtonWidth, kUrlBarHeight, TRUE);
+    int x = barWidth;
+    MoveWindow(translateButton_, x, 0, kTranslateButtonWidth,
+               kUrlBarHeight, TRUE);
+    x += kTranslateButtonWidth;
+    MoveWindow(directionButton_, x, 0, kDirectionButtonWidth,
+               kUrlBarHeight, TRUE);
+    x += kDirectionButtonWidth;
+    MoveWindow(goButton_, x, 0, kGoButtonWidth, kUrlBarHeight, TRUE);
     MoveWindow(webHost_, 0, kUrlBarHeight, std::max(1, width), webHeight, TRUE);
 
     if (onResize_) {
@@ -203,6 +215,18 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 0, 0, 0, 0, hwnd,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kEditControlId)),
                 self->instance_, nullptr);
+            self->translateButton_ = CreateWindowExW(
+                0, L"BUTTON", L"訳",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                0, 0, 0, 0, hwnd,
+                reinterpret_cast<HMENU>(static_cast<INT_PTR>(kTranslateButtonId)),
+                self->instance_, nullptr);
+            self->directionButton_ = CreateWindowExW(
+                0, L"BUTTON", L"→JA",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                0, 0, 0, 0, hwnd,
+                reinterpret_cast<HMENU>(static_cast<INT_PTR>(kDirectionButtonId)),
+                self->instance_, nullptr);
             self->goButton_ = CreateWindowExW(
                 0, L"BUTTON", L"GO",
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
@@ -215,17 +239,21 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
                 0, 0, 0, 0, hwnd, nullptr, self->instance_, nullptr);
 
+            // Variable font on Windows 11, with Segoe UI as the automatic
+            // fallback on older systems. ClearType keeps small text crisp.
             self->uiFont_ = CreateFontW(
                 -10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                L"Segoe UI Variable Text");
             const HFONT font = self->uiFont_ != nullptr
                                    ? self->uiFont_
                                    : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-            SendMessageW(self->urlEdit_, WM_SETFONT,
-                         reinterpret_cast<WPARAM>(font), TRUE);
-            SendMessageW(self->goButton_, WM_SETFONT,
-                         reinterpret_cast<WPARAM>(font), TRUE);
+            for (HWND control : {self->urlEdit_, self->translateButton_,
+                                 self->directionButton_, self->goButton_}) {
+                SendMessageW(control, WM_SETFONT,
+                             reinterpret_cast<WPARAM>(font), TRUE);
+            }
             SendMessageW(self->urlEdit_, EM_SETMARGINS, EC_LEFTMARGIN,
                          MAKELPARAM(8, 0));
             SendMessageW(self->urlEdit_, EM_SETCUEBANNER, TRUE,
@@ -242,29 +270,79 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
 
         case WM_SIZE:
             self->layout();
+            // Idle rule: no rendering at all while minimized.
+            if (self->onVisibility_) {
+                if (wParam == SIZE_MINIMIZED) {
+                    self->onVisibility_(false);
+                } else if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED) {
+                    self->onVisibility_(true);
+                }
+            }
+            return 0;
+
+        case WM_ACTIVATE:
+            // Also stop rendering while another window is in front.
+            if (self->onVisibility_) {
+                self->onVisibility_(LOWORD(wParam) != WA_INACTIVE &&
+                                    !IsIconic(hwnd));
+            }
             return 0;
 
         case WM_COMMAND:
-            if (LOWORD(wParam) == kGoButtonId && HIWORD(wParam) == BN_CLICKED) {
-                self->submitUrl();
+            if (HIWORD(wParam) == BN_CLICKED) {
+                switch (LOWORD(wParam)) {
+                case kGoButtonId:
+                    self->submitUrl();
+                    break;
+                case kTranslateButtonId:
+                    if (self->onTranslate_) {
+                        self->onTranslate_(self->translateToJapanese_);
+                    }
+                    break;
+                case kDirectionButtonId:
+                    self->translateToJapanese_ = !self->translateToJapanese_;
+                    SetWindowTextW(self->directionButton_,
+                                   self->translateToJapanese_ ? L"→JA" : L"→EN");
+                    InvalidateRect(self->directionButton_, nullptr, TRUE);
+                    break;
+                default:
+                    break;
+                }
             }
             return 0;
 
         case WM_DRAWITEM: {
             auto* draw = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
-            if (draw->CtlID != kGoButtonId) {
+            const wchar_t* label = nullptr;
+            COLORREF accent = RGB(0, 120, 215);
+            switch (draw->CtlID) {
+            case kGoButtonId:
+                label = L"GO";
+                break;
+            case kTranslateButtonId:
+                label = L"訳";
+                accent = RGB(0, 145, 105);
+                break;
+            case kDirectionButtonId:
+                label = self->translateToJapanese_ ? L"→JA" : L"→EN";
+                accent = RGB(88, 92, 110);
+                break;
+            default:
                 break;
             }
-            const COLORREF accent =
-                (draw->itemState & ODS_SELECTED) != 0
-                    ? RGB(0, 90, 180)
-                    : RGB(0, 120, 215);
+            if (label == nullptr) {
+                break;
+            }
+            if ((draw->itemState & ODS_SELECTED) != 0) {
+                accent = RGB(GetRValue(accent) / 2, GetGValue(accent) / 2,
+                             GetBValue(accent) / 2);
+            }
             HBRUSH brush = CreateSolidBrush(accent);
             FillRect(draw->hDC, &draw->rcItem, brush);
             DeleteObject(brush);
             SetBkMode(draw->hDC, TRANSPARENT);
             SetTextColor(draw->hDC, RGB(255, 255, 255));
-            DrawTextW(draw->hDC, L"GO", -1, &draw->rcItem,
+            DrawTextW(draw->hDC, label, -1, &draw->rcItem,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             return TRUE;
         }

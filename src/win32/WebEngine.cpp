@@ -2,6 +2,7 @@
 
 #include "../common/Log.h"
 #include "../common/Text.h"
+#include "../common/Translation.h"
 #include "../common/UrlUtils.h"
 
 #include <algorithm>
@@ -32,6 +33,13 @@ constexpr wchar_t kBrowserArguments[] =
     L"--ignore-gpu-blocklist "
     L"--enable-gpu-rasterization "
     L"--use-angle=d3d11 "
+    L"--disable-background-networking "
+    L"--disable-component-update "
+    L"--disable-domain-reliability "
+    L"--disable-sync "
+    L"--disable-default-apps "
+    L"--no-first-run "
+    L"--metrics-recording-only "
     L"--disable-features=Translate,BackForwardCache,OptimizationHints,MediaRouter";
 
 std::wstring userDataFolder() {
@@ -230,6 +238,28 @@ void WebEngine::resize(int width, int height) {
     bounds.right = std::max(1, width);
     bounds.bottom = std::max(1, height);
     controller_->put_Bounds(bounds);
+}
+
+void WebEngine::setVisible(bool visible) {
+    if (controller_) {
+        controller_->put_IsVisible(visible ? TRUE : FALSE);
+    }
+}
+
+void WebEngine::translate(translation::Direction direction) {
+    if (!webView_) {
+        return;
+    }
+    const std::wstring script =
+        text::utf8ToWide(translation::buildTranslateScript(direction));
+    if (script.empty()) {
+        return;
+    }
+    webView_->ExecuteScriptAsync(
+        script.c_str(),
+        Microsoft::WRL::Callback<
+            ICoreWebView2ExecuteScriptCompletedHandler>(
+            [](HRESULT, LPCWSTR) -> HRESULT { return S_OK; }).Get());
 }
 
 } // namespace catbrowser

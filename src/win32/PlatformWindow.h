@@ -37,6 +37,12 @@ public:
     void setOnResize(std::function<void(int, int)> callback) {
         onResize_ = std::move(callback);
     }
+    void setOnTranslate(std::function<void(bool toJapanese)> callback) {
+        onTranslate_ = std::move(callback);
+    }
+    void setOnVisibility(std::function<void(bool visible)> callback) {
+        onVisibility_ = std::move(callback);
+    }
 
 private:
     static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -49,6 +55,8 @@ private:
     HWND hwnd_ = nullptr;
     HWND urlEdit_ = nullptr;
     HWND goButton_ = nullptr;
+    HWND translateButton_ = nullptr;
+    HWND directionButton_ = nullptr;
     HWND webHost_ = nullptr;
     WNDPROC originalEditProc_ = nullptr;
     HFONT uiFont_ = nullptr;
@@ -56,10 +64,13 @@ private:
     RECT savedRect_{};
     LONG_PTR savedStyle_ = 0;
     bool fullscreen_ = false;
+    bool translateToJapanese_ = true;
 
     std::function<void(const std::string&)> onNavigate_;
     std::function<void()> onReload_;
     std::function<void(int, int)> onResize_;
+    std::function<void(bool)> onTranslate_;
+    std::function<void(bool)> onVisibility_;
 };
 
 } // namespace catbrowser
