@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: Configure (windows-release)",
+      "type": "shell",
+      "command": "cmake --preset windows-release",
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake: Build (windows-release)",
+      "type": "shell",
+      "command": "cmake --build --preset windows-release",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$msCompile"]
+    }
+  ]
+}

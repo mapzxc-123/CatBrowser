@@ -1,0 +1,125 @@
+name: Build native launchers
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_deferred_platforms:
+        description: 'Also build macOS and Linux (deferred for now)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64 (Win32 + WebView2)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download WebView2 SDK (NuGet)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe" `
+            -OutFile "nuget.exe"
+          .\nuget.exe install Microsoft.Web.WebView2 `
+            -ExcludeVersion -OutputDirectory packages -NonInteractive
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake -S . -B build -A x64
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows | Out-Null
+          Copy-Item "build/Release/CatBrowser.exe" artifacts/windows/
+          Get-ChildItem artifacts/windows | Format-Table Name,Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CatBrowser-Windows-x64
+          path: artifacts/windows/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal (Cocoa + WKWebView) [deferred]
+    if: ${{ inputs.build_deferred_platforms == true }}
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (universal binary)
+        run: >
+          cmake -S . -B build
+          -DCATBROWSER_WINDOWS_ONLY=OFF
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package artifact
+        run: |
+          mkdir -p artifacts/macos
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/CatBrowser.app artifacts/macos/CatBrowser-macos.zip
+          ls -lh artifacts/macos
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CatBrowser-macOS-universal
+          path: artifacts/macos/*
+          if-no-files-found: error
+
+  linux:
+    name: Linux x64 (GTK3 + WebKitGTK) [deferred]
+    if: ${{ inputs.build_deferred_platforms == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          if apt-cache show libwebkit2gtk-4.1-dev >/dev/null 2>&1; then
+            sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          else
+            sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          fi
+
+      - name: Configure
+        run: cmake -S . -B build -DCATBROWSER_WINDOWS_ONLY=OFF -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Stage artifact
+        run: |
+          mkdir -p artifacts/linux
+          cp build/CatBrowser artifacts/linux/
+          ldd artifacts/linux/CatBrowser || true
+          ls -lh artifacts/linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CatBrowser-Linux-x64
+          path: artifacts/linux/*
+          if-no-files-found: error

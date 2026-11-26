@@ -1,0 +1,9 @@
+build/
+out/
+packages/
+artifacts/
+nuget.exe
+.vscode/ipch/
+CMakeUserPresets.json
+*.user
+.DS_Store
