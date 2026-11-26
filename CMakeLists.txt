@@ -24,7 +24,7 @@ endif()
 if(MSVC)
     add_compile_options(
         /O2 /Ob2 /Oi /Ot /Gy /GF /GL
-        /EHsc /W4 /permissive-)
+        /EHsc /W4 /permissive- /utf-8)
     if(CATBROWSER_STATIC_RUNTIME)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
