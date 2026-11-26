@@ -2,6 +2,8 @@ build/
 out/
 packages/
 artifacts/
+artifact.zip
+*.zip
 nuget.exe
 .vscode/ipch/
 CMakeUserPresets.json
