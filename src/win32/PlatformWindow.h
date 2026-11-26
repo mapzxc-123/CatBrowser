@@ -51,6 +51,7 @@ private:
     HWND goButton_ = nullptr;
     HWND webHost_ = nullptr;
     WNDPROC originalEditProc_ = nullptr;
+    HFONT uiFont_ = nullptr;
 
     RECT savedRect_{};
     LONG_PTR savedStyle_ = 0;

@@ -6,9 +6,10 @@
 namespace catbrowser {
 
 int runPlatform(const AppConfig& config) {
-    // Force the discrete GPU / high performance power scheme.
-    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+    // Slight boost without starving the rest of the system. HIGH_PRIORITY_CLASS
+    // made the whole machine feel sluggish for no measurable gain here.
+    SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 

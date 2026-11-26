@@ -4,12 +4,13 @@
 #include "../common/UrlUtils.h"
 
 #include <algorithm>
+#include <commctrl.h>
 
 namespace catbrowser {
 namespace {
 
-constexpr int kUrlBarHeight = 30;
-constexpr int kGoButtonWidth = 64;
+constexpr int kUrlBarHeight = 32;
+constexpr int kGoButtonWidth = 72;
 constexpr int kEditControlId = 100;
 constexpr int kGoButtonId = 101;
 
@@ -29,6 +30,10 @@ PlatformWindow::~PlatformWindow() {
     if (urlEdit_ != nullptr && originalEditProc_ != nullptr) {
         SetWindowLongPtrW(urlEdit_, GWLP_WNDPROC,
                           reinterpret_cast<LONG_PTR>(originalEditProc_));
+    }
+    if (uiFont_ != nullptr) {
+        DeleteObject(uiFont_);
+        uiFont_ = nullptr;
     }
     if (g_activeWindow == this) {
         g_activeWindow = nullptr;
@@ -200,7 +205,7 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 self->instance_, nullptr);
             self->goButton_ = CreateWindowExW(
                 0, L"BUTTON", L"GO",
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd,
                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(kGoButtonId)),
                 self->instance_, nullptr);
@@ -210,11 +215,21 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
                 0, 0, 0, 0, hwnd, nullptr, self->instance_, nullptr);
 
-            const HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+            self->uiFont_ = CreateFontW(
+                -10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+            const HFONT font = self->uiFont_ != nullptr
+                                   ? self->uiFont_
+                                   : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
             SendMessageW(self->urlEdit_, WM_SETFONT,
                          reinterpret_cast<WPARAM>(font), TRUE);
             SendMessageW(self->goButton_, WM_SETFONT,
                          reinterpret_cast<WPARAM>(font), TRUE);
+            SendMessageW(self->urlEdit_, EM_SETMARGINS, EC_LEFTMARGIN,
+                         MAKELPARAM(8, 0));
+            SendMessageW(self->urlEdit_, EM_SETCUEBANNER, TRUE,
+                         reinterpret_cast<LPARAM>(L"URL を入力 (http / https)"));
 
             self->originalEditProc_ = reinterpret_cast<WNDPROC>(
                 SetWindowLongPtrW(self->urlEdit_, GWLP_WNDPROC,
@@ -235,6 +250,32 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             }
             return 0;
 
+        case WM_DRAWITEM: {
+            auto* draw = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+            if (draw->CtlID != kGoButtonId) {
+                break;
+            }
+            const COLORREF accent =
+                (draw->itemState & ODS_SELECTED) != 0
+                    ? RGB(0, 90, 180)
+                    : RGB(0, 120, 215);
+            HBRUSH brush = CreateSolidBrush(accent);
+            FillRect(draw->hDC, &draw->rcItem, brush);
+            DeleteObject(brush);
+            SetBkMode(draw->hDC, TRANSPARENT);
+            SetTextColor(draw->hDC, RGB(255, 255, 255));
+            DrawTextW(draw->hDC, L"GO", -1, &draw->rcItem,
+                      DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            return TRUE;
+        }
+
+        case WM_GETMINMAXINFO: {
+            auto* mmi = reinterpret_cast<MINMAXINFO*>(lParam);
+            mmi->ptMinTrackSize.x = 360;
+            mmi->ptMinTrackSize.y = 240;
+            return 0;
+        }
+
         case WM_KEYDOWN:
             if (wParam == VK_F5) {
                 if (self->onReload_) {
@@ -253,6 +294,10 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 SetWindowLongPtrW(self->urlEdit_, GWLP_WNDPROC,
                                   reinterpret_cast<LONG_PTR>(self->originalEditProc_));
                 self->originalEditProc_ = nullptr;
+            }
+            if (self->uiFont_ != nullptr) {
+                DeleteObject(self->uiFont_);
+                self->uiFont_ = nullptr;
             }
             if (g_activeWindow == self) {
                 g_activeWindow = nullptr;

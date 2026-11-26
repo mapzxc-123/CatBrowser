@@ -94,7 +94,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 
 | OS | 設定 |
 |---|---|
-| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`HIGH_PRIORITY_CLASS`、指定された Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化 |
+| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`（システム全体を遅くしない範囲）、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化 |
 | macOS | `NSActivityUserInitiated \| NSActivityLatencyCritical` で App Nap 無効、`nonPersistentDataStore`、`WKPreferences` の `_acceleratedDrawingEnabled` / `_webGLEnabled` / `_canvasUsesAcceleratedDrawing` を KVC で有効化、レイヤーバックトビュー |
 | Linux | `setpriority(PRIO_PROCESS, 0, -10)`、ephemeral `WebKitWebContext`、`enable-webgl` / `enable-accelerated-2d-canvas` / `hardware-acceleration-policy=ALWAYS` |
 
@@ -105,6 +105,8 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
   このランチャーだけでは完全にゼロにはできません。上記は「_delay 要因を減らす_」ための設定です。
 - WebView2 のブラウザフラグは Microsoft が長期サポートを保証しない開発用フラグです。
   Runtime のバージョンによっては無視されます。
+- `--disable-frame-rate-limit` や背景スロットリング無効化は「重い」原因になるため
+  意図的に外しています。GPU 加速は `ignore-gpu-blocklist` / `use-angle=d3d11` で維持します。
 - `_acceleratedDrawingEnabled` などの WKPreferences キーは非公開 SPI です。
   macOS の更新で名前が変わった場合は `@try/@catch` により安全に無視されます。
 - Linux で nice 値を下げるには `CAP_SYS_NICE` または高い `RLIMIT_NICE` が必要です。

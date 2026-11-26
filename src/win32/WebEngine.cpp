@@ -20,20 +20,18 @@
 namespace catbrowser {
 namespace {
 
-// Exactly the switch set requested for maximum, unthrottled GPU/CPU output.
-// NOTE: browser flags are not a long-term supported WebView2 API and may be
-// ignored by the runtime; they are injected through the documented
-// AdditionalBrowserArguments property.
+// Keep only the switches that actually help: GPU acceleration plus removal of
+// background work we never use. Deliberately NOT set:
+//   --disable-frame-rate-limit       (pegs the GPU/CPU even while idle)
+//   --disable-background-timer-throttling / --disable-renderer-backgrounding
+//   --process-per-site               (extra browser processes)
+//   --disable-dev-shm-usage          (forces disk I/O instead of shared memory)
+// Browser flags are not a long-term supported WebView2 API and may be ignored
+// by the runtime; they are injected via the documented AdditionalBrowserArguments.
 constexpr wchar_t kBrowserArguments[] =
-    L"--disable-frame-rate-limit "
     L"--ignore-gpu-blocklist "
     L"--enable-gpu-rasterization "
     L"--use-angle=d3d11 "
-    L"--disable-background-timer-throttling "
-    L"--disable-renderer-backgrounding "
-    L"--process-per-site "
-    L"--disable-extensions "
-    L"--disable-dev-shm-usage "
     L"--disable-features=Translate,BackForwardCache,OptimizationHints,MediaRouter";
 
 std::wstring userDataFolder() {
