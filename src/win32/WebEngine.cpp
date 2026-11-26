@@ -255,7 +255,7 @@ void WebEngine::translate(translation::Direction direction) {
     if (script.empty()) {
         return;
     }
-    webView_->ExecuteScriptAsync(
+    webView_->ExecuteScript(
         script.c_str(),
         Microsoft::WRL::Callback<
             ICoreWebView2ExecuteScriptCompletedHandler>(
