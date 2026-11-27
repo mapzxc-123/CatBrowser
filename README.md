@@ -15,10 +15,10 @@ GPU 関係の開発用フラグも外し、ページ要求を UI ハンドラー
 
 **バージョン 1.5** では名称を **AstB3ast** に変更しました。設定・履歴・辞書は
 1.5 から完全に新規のものとして扱い、旧 `CatBrowser.ini` は読み込みません。
-1.5 の exe は `artifacts/windows/AstB3ast-1.5.exe`、1.4 以前は
-`artifacts/windows/CatBrowser-1.4.exe` / `CatBrowser-1.3.exe` /
-`CatBrowser-1.2.exe` に残しています。タグは `v1.7` / `v1.6` / `v1.5` /
-`v1.4` / `v1.3` / `v1.2` です。
+1.7 の exe は `artifacts/windows/AstB3ast-1.7.exe`、1.6 は `AstB3ast-1.6.exe`、
+1.5 は `AstB3ast-1.5.exe`、1.4 以前は `artifacts/windows/CatBrowser-1.4.exe` /
+`CatBrowser-1.3.exe` / `CatBrowser-1.2.exe` に残しています。タグは `v1.7` /
+`v1.6` / `v1.5` / `v1.4` / `v1.3` / `v1.2` です。
 
 > **現在の優先順位: Windows のみ。** macOS / Linux のソースは将来用に残していますが、
 > 既定ではビルド対象外です（後回し）。Windows の完成・検証を優先しています。
