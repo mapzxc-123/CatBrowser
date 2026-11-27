@@ -54,6 +54,7 @@ int runPlatform(const AppConfig& config) {
     window.setOnVisibility([&](bool visible) {
         engine.setVisible(visible);
     });
+    window.setOnFocusWeb([&] { engine.focus(); });
     window.setOnEngineChanged([&](search::Engine selected) {
         settings.engine = selected;
         localdata::saveSettings(settings);
@@ -66,6 +67,7 @@ int runPlatform(const AppConfig& config) {
 
     engine.setOnReload([&] { engine.reload(); });
     engine.setOnFullscreenToggle([&] { window.toggleFullscreen(); });
+    engine.setOnOpenSearch([&] { window.openSearch(); });
     engine.setOnNavigationStateChanged([&](bool canBack, bool canForward) {
         window.setNavigationState(canBack, canForward);
     });

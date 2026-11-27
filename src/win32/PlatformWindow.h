@@ -14,8 +14,9 @@
 
 namespace astb3ast {
 
-// Pure Win32 window: a compact 32px control bar + a child HWND used as the
-// WebView2 host. No toolbars, tabs, bookmarks or other browser UI.
+// Pure Win32 window: a thin 24px icon bar that auto-hides, a lazily created
+// search/history overlay, and a child HWND used as the WebView2 host.
+// No toolbars, tabs, bookmarks or other browser UI.
 class PlatformWindow {
 public:
     explicit PlatformWindow(HINSTANCE instance);
@@ -31,14 +32,14 @@ public:
 
     void toggleFullscreen();
 
+    // Called by the WebView2 accelerator hook when Ctrl+L is pressed while the
+    // page has focus.
+    void openSearch();
+
     // UI state, restored from AstB3ast.ini at startup.
     void setEngine(search::Engine engine);
     void setTheme(bool dark);
-    void setHistory(std::vector<std::wstring> history) {
-        history_ = std::move(history);
-        historyIndex_ = -1;
-        historyDraft_.clear();
-    }
+    void setHistory(std::vector<std::wstring> history);
     void setNavigationState(bool canBack, bool canForward);
 
     void setOnNavigate(std::function<void(const std::string&)> callback) {
@@ -72,33 +73,61 @@ public:
     void setOnThemeChanged(std::function<void(bool dark)> callback) {
         onThemeChanged_ = std::move(callback);
     }
+    void setOnFocusWeb(std::function<void()> callback) {
+        onFocusWeb_ = std::move(callback);
+    }
 
 private:
     static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK editProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK listProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static bool isCtrlL(WPARAM virtualKey);
+    static bool handleControlKey(PlatformWindow* self, WPARAM virtualKey);
 
     void submitUrl();
-    void layout();
+    void applyLayout();
+    void setBarVisible(bool visible);
+    void revealBar();
+    void maybeAutoHideBar();
+    void ensureOverlay();
+    void positionOverlay();
+    void showOverlayControls(bool visible);
+    void openOverlay();
+    void closeOverlay(bool focusWeb);
     void refreshButtonText();
+    void refreshHistoryList();
+    void selectHistoryEntry();
     void browseHistory(bool older);
+    void handleFunctionKey(int virtualKey);
     HBRUSH controlBrush() const { return darkTheme_ ? darkBrush_ : lightBrush_; }
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
-    HWND urlEdit_ = nullptr;
-    HWND goButton_ = nullptr;
-    HWND translateButton_ = nullptr;
-    HWND directionButton_ = nullptr;
+    HWND webHost_ = nullptr;
+
+    // Always-created bar controls (icon glyphs, no text labels).
+    HWND searchButton_ = nullptr;
     HWND backButton_ = nullptr;
     HWND forwardButton_ = nullptr;
     HWND reloadButton_ = nullptr;
     HWND fullscreenButton_ = nullptr;
-    HWND modeButton_ = nullptr;
-    HWND engineButton_ = nullptr;
+    HWND translateButton_ = nullptr;
+    HWND directionButton_ = nullptr;
     HWND themeButton_ = nullptr;
-    HWND webHost_ = nullptr;
+
+    // Lazily created overlay controls.
+    HWND overlayPanel_ = nullptr;
+    HWND overlayEdit_ = nullptr;
+    HWND overlayMode_ = nullptr;
+    HWND overlayEngine_ = nullptr;
+    HWND overlayClose_ = nullptr;
+    HWND overlayList_ = nullptr;
+    bool overlayCreated_ = false;
+
     WNDPROC originalEditProc_ = nullptr;
+    WNDPROC originalListProc_ = nullptr;
     HFONT uiFont_ = nullptr;
+    HFONT iconFont_ = nullptr;
     HBRUSH darkBrush_ = nullptr;
     HBRUSH lightBrush_ = nullptr;
 
@@ -108,7 +137,15 @@ private:
     bool translateToJapanese_ = true;
     bool searchMode_ = false;
     bool darkTheme_ = true;
+    bool barVisible_ = true;
+    bool overlayVisible_ = false;
+    bool editFocused_ = false;
     search::Engine engine_ = search::Engine::DuckDuckGo;
+
+    // WebView bounds are only re-applied when they actually change.
+    int lastHostTop_ = -1;
+    int lastHostWidth_ = -1;
+    int lastHostHeight_ = -1;
 
     std::vector<std::wstring> history_;
     int historyIndex_ = -1;
@@ -124,6 +161,7 @@ private:
     std::function<void(bool)> onVisibility_;
     std::function<void(search::Engine)> onEngineChanged_;
     std::function<void(bool)> onThemeChanged_;
+    std::function<void()> onFocusWeb_;
 };
 
 } // namespace astb3ast

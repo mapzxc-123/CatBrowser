@@ -161,7 +161,7 @@ void WebEngine::applySettings() {
 }
 
 void WebEngine::registerAccelerators() {
-    // F5/F11 must work even while WebView2 itself has keyboard focus.
+    // Ctrl+L, F5 and F11 must work even while WebView2 itself has focus.
     controller_->add_AcceleratorKeyPressed(
         Microsoft::WRL::Callback<
             ICoreWebView2AcceleratorKeyPressedEventHandler>(
@@ -183,7 +183,13 @@ void WebEngine::registerAccelerators() {
                 // Set Handled before making any outgoing COM calls: in
                 // windowed mode WebView2 blocks cross-process calls until the
                 // accelerator event is handled.
-                if (virtualKey == VK_F5) {
+                if (virtualKey == 'L' &&
+                    (GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+                    args->put_Handled(TRUE);
+                    if (onOpenSearch_) {
+                        onOpenSearch_();
+                    }
+                } else if (virtualKey == VK_F5) {
                     args->put_Handled(TRUE);
                     if (onReload_) {
                         onReload_();

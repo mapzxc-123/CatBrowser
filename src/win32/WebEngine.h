@@ -43,6 +43,9 @@ public:
     void setOnFullscreenToggle(std::function<void()> callback) {
         onFullscreenToggle_ = std::move(callback);
     }
+    void setOnOpenSearch(std::function<void()> callback) {
+        onOpenSearch_ = std::move(callback);
+    }
     void setOnNavigationStateChanged(std::function<void(bool canBack, bool canForward)> callback) {
         onNavigationStateChanged_ = std::move(callback);
     }
@@ -69,6 +72,7 @@ private:
 
     std::function<void()> onReload_;
     std::function<void()> onFullscreenToggle_;
+    std::function<void()> onOpenSearch_;
     std::function<void(bool, bool)> onNavigationStateChanged_;
 };
 

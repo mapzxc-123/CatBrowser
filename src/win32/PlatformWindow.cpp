@@ -12,44 +12,71 @@
 namespace astb3ast {
 namespace {
 
-constexpr int kUrlBarHeight = 32;
-constexpr int kNavButtonWidth = 28;
-constexpr int kModeButtonWidth = 48;
-constexpr int kEngineButtonWidth = 52;
-constexpr int kThemeButtonWidth = 30;
-constexpr int kTranslateButtonWidth = 32;
-constexpr int kDirectionButtonWidth = 48;
-constexpr int kGoButtonWidth = 52;
+constexpr int kBarHeight = 24;
+constexpr int kButtonWidth = 26;
+constexpr int kSearchButtonWidth = 30;
+constexpr int kRevealZone = 10;
+constexpr int kKeepVisibleZone = 24;
 
-constexpr int kEditControlId = 100;
-constexpr int kGoButtonId = 101;
-constexpr int kTranslateButtonId = 102;
-constexpr int kDirectionButtonId = 103;
-constexpr int kBackButtonId = 104;
-constexpr int kForwardButtonId = 105;
-constexpr int kReloadButtonId = 106;
-constexpr int kFullscreenButtonId = 107;
-constexpr int kModeButtonId = 108;
-constexpr int kEngineButtonId = 109;
-constexpr int kThemeButtonId = 110;
+constexpr int kOverlayMaxWidth = 560;
+constexpr int kOverlayMinWidth = 320;
+constexpr int kOverlayHeight = 176;
+constexpr int kOverlayMargin = 8;
+constexpr int kOverlayRowHeight = 24;
+constexpr int kOverlayGap = 4;
+constexpr int kOverlayIconWidth = 24;
 
-// One launcher window per process; used only by the edit control subclass.
+constexpr int kSearchButtonId = 100;
+constexpr int kBackButtonId = 101;
+constexpr int kForwardButtonId = 102;
+constexpr int kReloadButtonId = 103;
+constexpr int kFullscreenButtonId = 104;
+constexpr int kTranslateButtonId = 105;
+constexpr int kDirectionButtonId = 106;
+constexpr int kThemeButtonId = 107;
+
+constexpr int kOverlayPanelId = 199;
+constexpr int kOverlayEditId = 200;
+constexpr int kOverlayModeId = 201;
+constexpr int kOverlayEngineId = 202;
+constexpr int kOverlayListId = 203;
+constexpr int kOverlayCloseId = 204;
+
+// MDL2 glyphs. Keeping them as literals avoids an icon resource file.
+constexpr const wchar_t* kGlyphSearch = L"\uE094";
+constexpr const wchar_t* kGlyphBack = L"\uE0C6";
+constexpr const wchar_t* kGlyphForward = L"\uE0C7";
+constexpr const wchar_t* kGlyphReload = L"\uE072";
+constexpr const wchar_t* kGlyphFullscreen = L"\uE1D8";
+constexpr const wchar_t* kGlyphTranslate = L"\uE28F";
+constexpr const wchar_t* kGlyphGlobe = L"\uE12B";
+constexpr const wchar_t* kGlyphTheme = L"\uE708";
+constexpr const wchar_t* kGlyphClose = L"\uE8BB";
+
+// One launcher window per process; shared by the edit/list subclasses.
 PlatformWindow* g_activeWindow = nullptr;
 
 std::wstring className() {
     return L"AstB3astWindowClass";
 }
 
-HWND createButton(HINSTANCE instance, HWND parent, const wchar_t* label, int id) {
+HWND createButton(HINSTANCE instance, HWND parent, const wchar_t* label,
+                  int id, bool visible) {
+    DWORD style = WS_CHILD | WS_TABSTOP | BS_OWNERDRAW;
+    if (visible) {
+        style |= WS_VISIBLE;
+    }
     return CreateWindowExW(
-        0, L"BUTTON", label,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+        0, L"BUTTON", label, style,
         0, 0, 0, 0, parent,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
         instance, nullptr);
 }
 
 std::wstring editText(HWND edit) {
+    if (edit == nullptr) {
+        return {};
+    }
     const int length = GetWindowTextLengthW(edit);
     std::wstring text(static_cast<size_t>(length), L'\0');
     if (length > 0) {
@@ -68,18 +95,59 @@ std::wstring trim(std::wstring value) {
     return std::wstring(first, last);
 }
 
+std::wstring engineGlyph(search::Engine engine) {
+    switch (engine) {
+    case search::Engine::DuckDuckGo: return L"D";
+    case search::Engine::Google: return L"G";
+    case search::Engine::Bing: return L"B";
+    }
+    return L"?";
+}
+
+bool usesIconFont(int controlId) {
+    switch (controlId) {
+    case kSearchButtonId:
+    case kBackButtonId:
+    case kForwardButtonId:
+    case kReloadButtonId:
+    case kFullscreenButtonId:
+    case kTranslateButtonId:
+    case kThemeButtonId:
+    case kOverlayModeId:
+    case kOverlayCloseId:
+        return true;
+    default:
+        return false;
+    }
+}
+
+int signedLowWord(LPARAM value) {
+    return static_cast<short>(LOWORD(value));
+}
+
+int signedHighWord(LPARAM value) {
+    return static_cast<short>(HIWORD(value));
+}
+
 } // namespace
 
 PlatformWindow::PlatformWindow(HINSTANCE instance)
     : instance_(instance != nullptr ? instance : GetModuleHandleW(nullptr)) {}
 
 PlatformWindow::~PlatformWindow() {
-    if (urlEdit_ != nullptr && originalEditProc_ != nullptr) {
-        SetWindowLongPtrW(urlEdit_, GWLP_WNDPROC,
+    if (overlayEdit_ != nullptr && originalEditProc_ != nullptr) {
+        SetWindowLongPtrW(overlayEdit_, GWLP_WNDPROC,
                           reinterpret_cast<LONG_PTR>(originalEditProc_));
+    }
+    if (overlayList_ != nullptr && originalListProc_ != nullptr) {
+        SetWindowLongPtrW(overlayList_, GWLP_WNDPROC,
+                          reinterpret_cast<LONG_PTR>(originalListProc_));
     }
     if (uiFont_ != nullptr) {
         DeleteObject(uiFont_);
+    }
+    if (iconFont_ != nullptr) {
+        DeleteObject(iconFont_);
     }
     if (darkBrush_ != nullptr) {
         DeleteObject(darkBrush_);
@@ -130,6 +198,19 @@ bool PlatformWindow::create() {
 int PlatformWindow::messageLoop() {
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        // WebView2 receives mouse messages in its own child HWND, so the
+        // parent's WM_MOUSEMOVE alone cannot reveal a hidden bar. Inspecting
+        // the thread queue keeps auto-hide working without timers or hooks.
+        if (message.message == WM_MOUSEMOVE && hwnd_ != nullptr) {
+            POINT point = message.pt;
+            if (ScreenToClient(hwnd_, &point)) {
+                if (point.y <= kRevealZone) {
+                    revealBar();
+                } else if (point.y > kBarHeight + kKeepVisibleZone) {
+                    maybeAutoHideBar();
+                }
+            }
+        }
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
@@ -170,6 +251,10 @@ void PlatformWindow::toggleFullscreen() {
     }
 }
 
+void PlatformWindow::openSearch() {
+    openOverlay();
+}
+
 void PlatformWindow::setEngine(search::Engine engine) {
     engine_ = engine;
     refreshButtonText();
@@ -182,7 +267,22 @@ void PlatformWindow::setTheme(bool dark) {
         SetClassLongPtrW(hwnd_, GCLP_HBRBACKGROUND,
                          reinterpret_cast<LONG_PTR>(controlBrush()));
         InvalidateRect(hwnd_, nullptr, TRUE);
+        for (HWND button : {searchButton_, backButton_, forwardButton_,
+                            reloadButton_, fullscreenButton_, translateButton_,
+                            directionButton_, themeButton_, overlayMode_,
+                            overlayEngine_, overlayClose_}) {
+            if (button != nullptr) {
+                InvalidateRect(button, nullptr, TRUE);
+            }
+        }
     }
+}
+
+void PlatformWindow::setHistory(std::vector<std::wstring> history) {
+    history_ = std::move(history);
+    historyIndex_ = -1;
+    historyDraft_.clear();
+    refreshHistoryList();
 }
 
 void PlatformWindow::setNavigationState(bool canBack, bool canForward) {
@@ -195,38 +295,67 @@ void PlatformWindow::setNavigationState(bool canBack, bool canForward) {
 }
 
 void PlatformWindow::refreshButtonText() {
-    if (modeButton_ != nullptr) {
-        SetWindowTextW(modeButton_, searchMode_ ? L"検索" : L"URL");
-    }
-    if (engineButton_ != nullptr) {
-        SetWindowTextW(engineButton_, search::engineLabel(engine_));
-    }
-    if (themeButton_ != nullptr) {
-        SetWindowTextW(themeButton_, darkTheme_ ? L"夜" : L"昼");
-    }
     if (directionButton_ != nullptr) {
-        SetWindowTextW(directionButton_, translateToJapanese_ ? L"→JA" : L"→EN");
+        SetWindowTextW(directionButton_, translateToJapanese_ ? L"JA" : L"EN");
     }
-    if (urlEdit_ != nullptr) {
-        SendMessageW(urlEdit_, EM_SETCUEBANNER, TRUE,
+    if (overlayMode_ != nullptr) {
+        SetWindowTextW(overlayMode_, searchMode_ ? kGlyphSearch : kGlyphGlobe);
+    }
+    if (overlayEngine_ != nullptr) {
+        SetWindowTextW(overlayEngine_, engineGlyph(engine_).c_str());
+    }
+    if (overlayEdit_ != nullptr) {
+        SendMessageW(overlayEdit_, EM_SETCUEBANNER, TRUE,
                      reinterpret_cast<LPARAM>(searchMode_
                          ? L"検索語を入力 (Enter で検索)"
                          : L"URL を入力 (http / https)"));
     }
-    for (HWND button : {modeButton_, engineButton_, themeButton_, directionButton_}) {
+    for (HWND button : {overlayMode_, overlayEngine_, directionButton_}) {
         if (button != nullptr) {
             InvalidateRect(button, nullptr, TRUE);
         }
     }
 }
 
+void PlatformWindow::refreshHistoryList() {
+    if (overlayList_ == nullptr) {
+        return;
+    }
+    SendMessageW(overlayList_, LB_RESETCONTENT, 0, 0);
+    for (const std::wstring& entry : history_) {
+        SendMessageW(overlayList_, LB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(entry.c_str()));
+    }
+}
+
+void PlatformWindow::selectHistoryEntry() {
+    if (overlayList_ == nullptr || overlayEdit_ == nullptr) {
+        return;
+    }
+    const int selection = static_cast<int>(
+        SendMessageW(overlayList_, LB_GETCURSEL, 0, 0));
+    if (selection == LB_ERR) {
+        return;
+    }
+    const int length = static_cast<int>(
+        SendMessageW(overlayList_, LB_GETTEXTLEN, selection, 0));
+    if (length == LB_ERR || length <= 0) {
+        return;
+    }
+    std::wstring value(static_cast<size_t>(length), L'\0');
+    SendMessageW(overlayList_, LB_GETTEXT, selection,
+                 reinterpret_cast<LPARAM>(value.data()));
+    SetWindowTextW(overlayEdit_, value.c_str());
+    SendMessageW(overlayEdit_, EM_SETSEL, length, length);
+}
+
 void PlatformWindow::browseHistory(bool older) {
-    if (urlEdit_ == nullptr || history_.empty()) {
+    if (overlayEdit_ == nullptr || history_.empty()) {
         return;
     }
     if (older) {
         if (historyIndex_ < 0) {
-            historyDraft_ = editText(urlEdit_);
+            historyDraft_ = editText(overlayEdit_);
             historyIndex_ = 0;
         } else if (historyIndex_ + 1 < static_cast<int>(history_.size())) {
             ++historyIndex_;
@@ -236,7 +365,7 @@ void PlatformWindow::browseHistory(bool older) {
     } else {
         if (historyIndex_ <= 0) {
             historyIndex_ = -1;
-            SetWindowTextW(urlEdit_, historyDraft_.c_str());
+            SetWindowTextW(overlayEdit_, historyDraft_.c_str());
         } else {
             --historyIndex_;
         }
@@ -244,56 +373,245 @@ void PlatformWindow::browseHistory(bool older) {
     const std::wstring& value =
         historyIndex_ >= 0 ? history_[static_cast<size_t>(historyIndex_)]
                            : historyDraft_;
-    SetWindowTextW(urlEdit_, value.c_str());
-    const int length = GetWindowTextLengthW(urlEdit_);
-    SendMessageW(urlEdit_, EM_SETSEL, length, length);
+    SetWindowTextW(overlayEdit_, value.c_str());
+    const int length = GetWindowTextLengthW(overlayEdit_);
+    SendMessageW(overlayEdit_, EM_SETSEL, length, length);
 }
 
-void PlatformWindow::layout() {
+void PlatformWindow::handleFunctionKey(int virtualKey) {
+    if (virtualKey == VK_F5) {
+        if (onReload_) {
+            onReload_();
+        }
+    } else if (virtualKey == VK_F11) {
+        toggleFullscreen();
+    }
+}
+
+void PlatformWindow::applyLayout() {
+    if (hwnd_ == nullptr || webHost_ == nullptr) {
+        return;
+    }
+
     RECT client{};
     GetClientRect(hwnd_, &client);
+    const int width = std::max(1, static_cast<int>(client.right));
+    const int height = std::max(1, static_cast<int>(client.bottom));
+    const int barTop = barVisible_ ? kBarHeight : 0;
+    const int webHeight = std::max(1, height - barTop);
 
-    const int width = client.right;
-    const int height = client.bottom;
-    const int fixedWidth =
-        4 * kNavButtonWidth + kModeButtonWidth + kEngineButtonWidth +
-        kThemeButtonWidth + kTranslateButtonWidth + kDirectionButtonWidth +
-        kGoButtonWidth;
-    const int barWidth = std::max(1, width - fixedWidth);
-    const int webHeight = std::max(1, height - kUrlBarHeight);
-
-    MoveWindow(urlEdit_, 0, 0, barWidth, kUrlBarHeight, TRUE);
-    int x = barWidth;
-    struct Button { HWND hwnd; int width; };
-    const Button buttons[] = {
-        {backButton_, kNavButtonWidth},
-        {forwardButton_, kNavButtonWidth},
-        {reloadButton_, kNavButtonWidth},
-        {fullscreenButton_, kNavButtonWidth},
-        {modeButton_, kModeButtonWidth},
-        {engineButton_, kEngineButtonWidth},
-        {themeButton_, kThemeButtonWidth},
-        {translateButton_, kTranslateButtonWidth},
-        {directionButton_, kDirectionButtonWidth},
-        {goButton_, kGoButtonWidth},
-    };
-    for (const Button& button : buttons) {
-        MoveWindow(button.hwnd, x, 0, button.width, kUrlBarHeight, TRUE);
-        x += button.width;
+    if (barVisible_) {
+        int x = 0;
+        const struct BarButton { HWND hwnd; int width; } buttons[] = {
+            {searchButton_, kSearchButtonWidth},
+            {backButton_, kButtonWidth},
+            {forwardButton_, kButtonWidth},
+            {reloadButton_, kButtonWidth},
+            {fullscreenButton_, kButtonWidth},
+            {translateButton_, kButtonWidth},
+            {directionButton_, kButtonWidth},
+            {themeButton_, kButtonWidth},
+        };
+        for (const BarButton& button : buttons) {
+            if (button.hwnd != nullptr) {
+                SetWindowPos(button.hwnd, HWND_TOP, x, 0, button.width,
+                             kBarHeight, SWP_NOACTIVATE);
+            }
+            x += button.width;
+        }
     }
-    MoveWindow(webHost_, 0, kUrlBarHeight, std::max(1, width), webHeight, TRUE);
 
-    if (onResize_) {
-        onResize_(width, webHeight);
+    // Move/resize the WebView host and notify the engine only when the bounds
+    // really change (bar visibility toggle or window resize).
+    if (width != lastHostWidth_ || barTop != lastHostTop_ ||
+        webHeight != lastHostHeight_) {
+        SetWindowPos(webHost_, HWND_BOTTOM, 0, barTop, width, webHeight,
+                     SWP_NOACTIVATE);
+        lastHostWidth_ = width;
+        lastHostTop_ = barTop;
+        lastHostHeight_ = webHeight;
+        if (onResize_) {
+            onResize_(width, webHeight);
+        }
+    }
+
+    positionOverlay();
+}
+
+void PlatformWindow::positionOverlay() {
+    if (!overlayCreated_ || hwnd_ == nullptr) {
+        return;
+    }
+    RECT client{};
+    GetClientRect(hwnd_, &client);
+    const int width = std::max(1, static_cast<int>(client.right));
+    const int overlayWidth = std::clamp(width - 2 * kOverlayMargin,
+                                        kOverlayMinWidth, kOverlayMaxWidth);
+    const int overlayHeight = kOverlayHeight;
+    const int x = std::max(0, (width - overlayWidth) / 2);
+    const int y = kBarHeight;
+
+    SetWindowPos(overlayPanel_, HWND_TOP, x, y, overlayWidth, overlayHeight,
+                 SWP_NOACTIVATE);
+
+    int cx = x + kOverlayMargin;
+    const int rowY = y + kOverlayMargin;
+    SetWindowPos(overlayMode_, HWND_TOP, cx, rowY, kOverlayIconWidth,
+                 kOverlayRowHeight, SWP_NOACTIVATE);
+    cx += kOverlayIconWidth + kOverlayGap;
+    SetWindowPos(overlayEngine_, HWND_TOP, cx, rowY, kOverlayIconWidth,
+                 kOverlayRowHeight, SWP_NOACTIVATE);
+    cx += kOverlayIconWidth + kOverlayGap;
+
+    const int closeX = x + overlayWidth - kOverlayMargin - kOverlayIconWidth;
+    const int editWidth = std::max(1, closeX - kOverlayGap - cx);
+    SetWindowPos(overlayEdit_, HWND_TOP, cx, rowY, editWidth,
+                 kOverlayRowHeight, SWP_NOACTIVATE);
+    SetWindowPos(overlayClose_, HWND_TOP, closeX, rowY, kOverlayIconWidth,
+                 kOverlayRowHeight, SWP_NOACTIVATE);
+
+    const int listY = rowY + kOverlayRowHeight + kOverlayGap;
+    const int listHeight = std::max(
+        1, overlayHeight - 2 * kOverlayMargin - kOverlayRowHeight - kOverlayGap);
+    SetWindowPos(overlayList_, HWND_TOP, x + kOverlayMargin, listY,
+                 overlayWidth - 2 * kOverlayMargin, listHeight,
+                 SWP_NOACTIVATE);
+}
+
+void PlatformWindow::setBarVisible(bool visible) {
+    if (barVisible_ == visible) {
+        return;
+    }
+    barVisible_ = visible;
+    for (HWND button : {searchButton_, backButton_, forwardButton_,
+                        reloadButton_, fullscreenButton_, translateButton_,
+                        directionButton_, themeButton_}) {
+        if (button != nullptr) {
+            ShowWindow(button, visible ? SW_SHOW : SW_HIDE);
+        }
+    }
+    applyLayout();
+}
+
+void PlatformWindow::revealBar() {
+    if (!barVisible_) {
+        setBarVisible(true);
+    }
+}
+
+void PlatformWindow::maybeAutoHideBar() {
+    if (!barVisible_ || overlayVisible_ || editFocused_ || hwnd_ == nullptr) {
+        return;
+    }
+    POINT point{};
+    if (!GetCursorPos(&point) || !ScreenToClient(hwnd_, &point)) {
+        return;
+    }
+    if (point.y > kBarHeight + kKeepVisibleZone) {
+        setBarVisible(false);
+    }
+}
+
+void PlatformWindow::ensureOverlay() {
+    if (overlayCreated_ || hwnd_ == nullptr) {
+        return;
+    }
+    overlayCreated_ = true;
+
+    overlayPanel_ = CreateWindowExW(
+        0, L"STATIC", nullptr,
+        WS_CHILD | WS_CLIPSIBLINGS | SS_NOTIFY,
+        0, 0, 0, 0, hwnd_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOverlayPanelId)),
+        instance_, nullptr);
+    overlayEdit_ = CreateWindowExW(
+        WS_EX_CLIENTEDGE, L"EDIT", L"",
+        WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL,
+        0, 0, 0, 0, hwnd_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOverlayEditId)),
+        instance_, nullptr);
+    overlayMode_ = createButton(instance_, hwnd_, kGlyphGlobe,
+                                kOverlayModeId, false);
+    overlayEngine_ = createButton(instance_, hwnd_, L"D",
+                                  kOverlayEngineId, false);
+    overlayClose_ = createButton(instance_, hwnd_, kGlyphClose,
+                                 kOverlayCloseId, false);
+    overlayList_ = CreateWindowExW(
+        WS_EX_CLIENTEDGE, L"LISTBOX", nullptr,
+        WS_CHILD | WS_TABSTOP | WS_VSCROLL | WS_CLIPSIBLINGS |
+            LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT,
+        0, 0, 0, 0, hwnd_,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kOverlayListId)),
+        instance_, nullptr);
+
+    const HFONT font = uiFont_ != nullptr
+                           ? uiFont_
+                           : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    const HFONT icon = iconFont_ != nullptr ? iconFont_ : font;
+    SendMessageW(overlayEdit_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+    SendMessageW(overlayList_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+    SendMessageW(overlayMode_, WM_SETFONT, reinterpret_cast<WPARAM>(icon), TRUE);
+    SendMessageW(overlayEngine_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+    SendMessageW(overlayClose_, WM_SETFONT, reinterpret_cast<WPARAM>(icon), TRUE);
+    SendMessageW(overlayEdit_, EM_SETMARGINS, EC_LEFTMARGIN, MAKELPARAM(6, 0));
+
+    originalEditProc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        overlayEdit_, GWLP_WNDPROC,
+        reinterpret_cast<LONG_PTR>(&PlatformWindow::editProc)));
+    originalListProc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+        overlayList_, GWLP_WNDPROC,
+        reinterpret_cast<LONG_PTR>(&PlatformWindow::listProc)));
+
+    refreshHistoryList();
+    refreshButtonText();
+    positionOverlay();
+}
+
+void PlatformWindow::showOverlayControls(bool visible) {
+    const int command = visible ? SW_SHOW : SW_HIDE;
+    for (HWND control : {overlayPanel_, overlayEdit_, overlayMode_,
+                         overlayEngine_, overlayClose_, overlayList_}) {
+        if (control != nullptr) {
+            ShowWindow(control, command);
+        }
+    }
+}
+
+void PlatformWindow::openOverlay() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+    ensureOverlay();
+    revealBar();
+    overlayVisible_ = true;
+    showOverlayControls(true);
+    refreshHistoryList();
+    positionOverlay();
+    SetFocus(overlayEdit_);
+    SendMessageW(overlayEdit_, EM_SETSEL, 0, -1);
+}
+
+void PlatformWindow::closeOverlay(bool focusWeb) {
+    if (!overlayVisible_) {
+        return;
+    }
+    overlayVisible_ = false;
+    editFocused_ = false;
+    historyIndex_ = -1;
+    historyDraft_.clear();
+    showOverlayControls(false);
+    maybeAutoHideBar();
+    if (focusWeb && onFocusWeb_) {
+        onFocusWeb_();
     }
 }
 
 void PlatformWindow::submitUrl() {
-    if (urlEdit_ == nullptr) {
+    if (overlayEdit_ == nullptr) {
         return;
     }
 
-    const std::wstring raw = trim(editText(urlEdit_));
+    const std::wstring raw = trim(editText(overlayEdit_));
     if (raw.empty()) {
         MessageBeep(MB_ICONWARNING);
         return;
@@ -311,29 +629,60 @@ void PlatformWindow::submitUrl() {
     if (onHistoryCommitted_) {
         onHistoryCommitted_(utf8);
     }
+    closeOverlay(false);
     if (onNavigate_) {
         onNavigate_(url);
     }
 }
 
+bool PlatformWindow::isCtrlL(WPARAM virtualKey) {
+    return virtualKey == 'L' && (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+}
+
+bool PlatformWindow::handleControlKey(PlatformWindow* self, WPARAM virtualKey) {
+    if (self == nullptr) {
+        return false;
+    }
+    if (isCtrlL(virtualKey)) {
+        self->openOverlay();
+        return true;
+    }
+    if (virtualKey == VK_ESCAPE) {
+        if (self->overlayVisible_) {
+            self->closeOverlay(true);
+        } else {
+            self->setBarVisible(false);
+        }
+        return true;
+    }
+    if (virtualKey == VK_F5 || virtualKey == VK_F11) {
+        self->handleFunctionKey(static_cast<int>(virtualKey));
+        return true;
+    }
+    return false;
+}
+
 LRESULT CALLBACK PlatformWindow::editProc(HWND hwnd, UINT message,
                                           WPARAM wParam, LPARAM lParam) {
-    if (g_activeWindow != nullptr && message == WM_KEYDOWN) {
-        if (wParam == VK_RETURN) {
-            g_activeWindow->submitUrl();
-            return 0;
-        }
-        if (wParam == VK_UP || wParam == VK_DOWN) {
-            g_activeWindow->browseHistory(wParam == VK_UP);
-            return 0;
-        }
-        if (wParam == VK_F5 && g_activeWindow->onReload_) {
-            g_activeWindow->onReload_();
-            return 0;
-        }
-        if (wParam == VK_F11) {
-            g_activeWindow->toggleFullscreen();
-            return 0;
+    if (g_activeWindow != nullptr) {
+        if (message == WM_SETFOCUS) {
+            g_activeWindow->editFocused_ = true;
+            g_activeWindow->revealBar();
+        } else if (message == WM_KILLFOCUS) {
+            g_activeWindow->editFocused_ = false;
+            g_activeWindow->maybeAutoHideBar();
+        } else if (message == WM_KEYDOWN) {
+            if (wParam == VK_RETURN) {
+                g_activeWindow->submitUrl();
+                return 0;
+            }
+            if (wParam == VK_UP || wParam == VK_DOWN) {
+                g_activeWindow->browseHistory(wParam == VK_UP);
+                return 0;
+            }
+            if (handleControlKey(g_activeWindow, wParam)) {
+                return 0;
+            }
         }
     }
     const WNDPROC original = g_activeWindow != nullptr
@@ -343,8 +692,27 @@ LRESULT CALLBACK PlatformWindow::editProc(HWND hwnd, UINT message,
                            hwnd, message, wParam, lParam);
 }
 
+LRESULT CALLBACK PlatformWindow::listProc(HWND hwnd, UINT message,
+                                          WPARAM wParam, LPARAM lParam) {
+    if (g_activeWindow != nullptr && message == WM_KEYDOWN) {
+        if (wParam == VK_RETURN) {
+            g_activeWindow->selectHistoryEntry();
+            g_activeWindow->submitUrl();
+            return 0;
+        }
+        if (handleControlKey(g_activeWindow, wParam)) {
+            return 0;
+        }
+    }
+    const WNDPROC original = g_activeWindow != nullptr
+                                 ? g_activeWindow->originalListProc_
+                                 : nullptr;
+    return CallWindowProcW(original != nullptr ? original : DefWindowProcW,
+                           hwnd, message, wParam, lParam);
+}
+
 LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
-                                           WPARAM wParam, LPARAM lParam) {
+                                            WPARAM wParam, LPARAM lParam) {
     PlatformWindow* self = nullptr;
     if (message == WM_CREATE) {
         const auto* create = reinterpret_cast<CREATESTRUCTW*>(lParam);
@@ -359,69 +727,74 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
     if (self != nullptr) {
         switch (message) {
         case WM_CREATE: {
-            self->urlEdit_ = CreateWindowExW(
-                WS_EX_CLIENTEDGE, L"EDIT", L"",
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-                0, 0, 0, 0, hwnd,
-                reinterpret_cast<HMENU>(static_cast<INT_PTR>(kEditControlId)),
-                self->instance_, nullptr);
-            self->backButton_ = createButton(self->instance_, hwnd, L"←", kBackButtonId);
-            self->forwardButton_ = createButton(self->instance_, hwnd, L"→", kForwardButtonId);
-            self->reloadButton_ = createButton(self->instance_, hwnd, L"再", kReloadButtonId);
-            self->fullscreenButton_ = createButton(self->instance_, hwnd, L"全", kFullscreenButtonId);
-            self->modeButton_ = createButton(self->instance_, hwnd, L"URL", kModeButtonId);
-            self->engineButton_ = createButton(self->instance_, hwnd,
-                                              search::engineLabel(self->engine_),
-                                              kEngineButtonId);
+            self->searchButton_ = createButton(self->instance_, hwnd,
+                                               kGlyphSearch,
+                                               kSearchButtonId, true);
+            self->backButton_ = createButton(self->instance_, hwnd,
+                                             kGlyphBack, kBackButtonId, true);
+            self->forwardButton_ = createButton(self->instance_, hwnd,
+                                                kGlyphForward,
+                                                kForwardButtonId, true);
+            self->reloadButton_ = createButton(self->instance_, hwnd,
+                                               kGlyphReload,
+                                               kReloadButtonId, true);
+            self->fullscreenButton_ = createButton(self->instance_, hwnd,
+                                                   kGlyphFullscreen,
+                                                   kFullscreenButtonId, true);
+            self->translateButton_ = createButton(self->instance_, hwnd,
+                                                  kGlyphTranslate,
+                                                  kTranslateButtonId, true);
+            self->directionButton_ = createButton(self->instance_, hwnd,
+                                                  L"JA", kDirectionButtonId,
+                                                  true);
             self->themeButton_ = createButton(self->instance_, hwnd,
-                                             self->darkTheme_ ? L"夜" : L"昼",
-                                             kThemeButtonId);
-            self->translateButton_ = createButton(self->instance_, hwnd, L"訳", kTranslateButtonId);
-            self->directionButton_ = createButton(self->instance_, hwnd, L"→JA", kDirectionButtonId);
-            self->goButton_ = createButton(self->instance_, hwnd, L"GO", kGoButtonId);
+                                              kGlyphTheme, kThemeButtonId,
+                                              true);
             // A plain STATIC child is enough of a parent for WebView2.
             self->webHost_ = CreateWindowExW(
                 0, L"STATIC", nullptr,
-                WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+                WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                 0, 0, 0, 0, hwnd, nullptr, self->instance_, nullptr);
 
-            // Variable font on Windows 11, with Segoe UI as the automatic
-            // fallback on older systems. ClearType keeps small text crisp.
+            // Segoe UI Variable for text, MDL2 Assets for the icon glyphs.
             self->uiFont_ = CreateFontW(
-                -10, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                -11, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
                 CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
                 L"Segoe UI Variable Text");
-            const HFONT font = self->uiFont_ != nullptr
-                                   ? self->uiFont_
-                                   : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-            for (HWND control : {self->urlEdit_, self->backButton_,
+            self->iconFont_ = CreateFontW(
+                -12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                L"Segoe MDL2 Assets");
+            const HFONT textFont = self->uiFont_ != nullptr
+                                       ? self->uiFont_
+                                       : static_cast<HFONT>(GetStockObject(
+                                             DEFAULT_GUI_FONT));
+            const HFONT glyphFont = self->iconFont_ != nullptr
+                                        ? self->iconFont_
+                                        : textFont;
+            for (HWND control : {self->searchButton_, self->backButton_,
                                  self->forwardButton_, self->reloadButton_,
-                                 self->fullscreenButton_, self->modeButton_,
-                                 self->engineButton_, self->themeButton_,
-                                 self->translateButton_, self->directionButton_,
-                                 self->goButton_}) {
+                                 self->fullscreenButton_,
+                                 self->translateButton_, self->themeButton_}) {
                 SendMessageW(control, WM_SETFONT,
-                             reinterpret_cast<WPARAM>(font), TRUE);
+                             reinterpret_cast<WPARAM>(glyphFont), TRUE);
             }
-            SendMessageW(self->urlEdit_, EM_SETMARGINS, EC_LEFTMARGIN,
-                         MAKELPARAM(8, 0));
+            SendMessageW(self->directionButton_, WM_SETFONT,
+                         reinterpret_cast<WPARAM>(textFont), TRUE);
+
             self->refreshButtonText();
             self->setNavigationState(false, false);
             SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND,
                              reinterpret_cast<LONG_PTR>(self->controlBrush()));
-
-            self->originalEditProc_ = reinterpret_cast<WNDPROC>(
-                SetWindowLongPtrW(self->urlEdit_, GWLP_WNDPROC,
-                                  reinterpret_cast<LONG_PTR>(&PlatformWindow::editProc)));
-
-            self->layout();
-            SetFocus(self->urlEdit_);
+            self->applyLayout();
+            SetFocus(self->webHost_);
             return 0;
         }
 
         case WM_SIZE:
-            self->layout();
+            self->applyLayout();
             // Idle rule: no rendering at all while minimized.
             if (self->onVisibility_) {
                 if (wParam == SIZE_MINIMIZED) {
@@ -438,17 +811,28 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 self->onVisibility_(LOWORD(wParam) != WA_INACTIVE &&
                                     !IsIconic(hwnd));
             }
+            if (LOWORD(wParam) != WA_INACTIVE) {
+                self->revealBar();
+            }
             return 0;
+
+        case WM_MOUSEMOVE: {
+            const int y = signedHighWord(lParam);
+            if (y <= kRevealZone) {
+                self->revealBar();
+            } else if (y > kBarHeight + kKeepVisibleZone) {
+                self->maybeAutoHideBar();
+            }
+            break;
+        }
 
         case WM_COMMAND:
             if (HIWORD(wParam) == BN_CLICKED) {
                 switch (LOWORD(wParam)) {
-                case kGoButtonId:
-                    self->submitUrl();
+                case kSearchButtonId:
+                    self->openOverlay();
                     break;
                 case kBackButtonId:
-                    // Navigation is handled by the engine's back/forward API;
-                    // wired by App_win through a dedicated callback below.
                     if (self->onBack_) {
                         self->onBack_();
                     }
@@ -466,25 +850,6 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 case kFullscreenButtonId:
                     self->toggleFullscreen();
                     break;
-                case kModeButtonId:
-                    self->searchMode_ = !self->searchMode_;
-                    self->refreshButtonText();
-                    break;
-                case kEngineButtonId: {
-                    const int next = (static_cast<int>(self->engine_) + 1) % 3;
-                    self->engine_ = static_cast<search::Engine>(next);
-                    self->refreshButtonText();
-                    if (self->onEngineChanged_) {
-                        self->onEngineChanged_(self->engine_);
-                    }
-                    break;
-                }
-                case kThemeButtonId:
-                    self->setTheme(!self->darkTheme_);
-                    if (self->onThemeChanged_) {
-                        self->onThemeChanged_(self->darkTheme_);
-                    }
-                    break;
                 case kTranslateButtonId:
                     if (self->onTranslate_) {
                         self->onTranslate_(self->translateToJapanese_);
@@ -494,28 +859,61 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                     self->translateToJapanese_ = !self->translateToJapanese_;
                     self->refreshButtonText();
                     break;
+                case kThemeButtonId:
+                    self->setTheme(!self->darkTheme_);
+                    if (self->onThemeChanged_) {
+                        self->onThemeChanged_(self->darkTheme_);
+                    }
+                    break;
+                case kOverlayModeId:
+                    self->searchMode_ = !self->searchMode_;
+                    self->refreshButtonText();
+                    break;
+                case kOverlayEngineId: {
+                    const int next = (static_cast<int>(self->engine_) + 1) % 3;
+                    self->engine_ = static_cast<search::Engine>(next);
+                    self->refreshButtonText();
+                    if (self->onEngineChanged_) {
+                        self->onEngineChanged_(self->engine_);
+                    }
+                    break;
+                }
+                case kOverlayCloseId:
+                    self->closeOverlay(true);
+                    break;
                 default:
                     break;
                 }
+            } else if (HIWORD(wParam) == LBN_SELCHANGE &&
+                       LOWORD(wParam) == kOverlayListId) {
+                self->selectHistoryEntry();
+            } else if (HIWORD(wParam) == LBN_DBLCLK &&
+                       LOWORD(wParam) == kOverlayListId) {
+                self->selectHistoryEntry();
+                self->submitUrl();
             }
             return 0;
 
         case WM_CTLCOLOREDIT:
-        case WM_CTLCOLORSTATIC: {
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLORLISTBOX: {
             HDC hdc = reinterpret_cast<HDC>(wParam);
-            SetTextColor(hdc, self->darkTheme_ ? RGB(238, 238, 238) : RGB(16, 16, 16));
-            SetBkColor(hdc, self->darkTheme_ ? RGB(32, 32, 32) : RGB(255, 255, 255));
+            SetTextColor(hdc, self->darkTheme_ ? RGB(238, 238, 238)
+                                               : RGB(16, 16, 16));
+            SetBkColor(hdc, self->darkTheme_ ? RGB(32, 32, 32)
+                                             : RGB(255, 255, 255));
             return reinterpret_cast<LRESULT>(self->controlBrush());
         }
 
         case WM_DRAWITEM: {
             auto* draw = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
             wchar_t label[64]{};
-            GetWindowTextW(draw->hwndItem, label, static_cast<int>(std::size(label)));
+            GetWindowTextW(draw->hwndItem, label,
+                           static_cast<int>(std::size(label)));
             bool accent = false;
             COLORREF accentColor = RGB(88, 92, 110);
             switch (draw->CtlID) {
-            case kGoButtonId:
+            case kSearchButtonId:
                 accent = true;
                 accentColor = RGB(0, 120, 215);
                 break;
@@ -523,11 +921,11 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
                 accent = true;
                 accentColor = RGB(0, 145, 105);
                 break;
-            case kModeButtonId:
+            case kOverlayModeId:
                 accent = true;
                 accentColor = RGB(20, 115, 140);
                 break;
-            case kEngineButtonId:
+            case kOverlayEngineId:
                 accent = true;
                 accentColor = RGB(105, 80, 165);
                 break;
@@ -555,8 +953,20 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             DeleteObject(brush);
             SetBkMode(draw->hDC, TRANSPARENT);
             SetTextColor(draw->hDC, foreground);
+            const HFONT font = usesIconFont(draw->CtlID)
+                                   ? (self->iconFont_ != nullptr
+                                          ? self->iconFont_
+                                          : self->uiFont_)
+                                   : self->uiFont_;
+            HFONT previous = font != nullptr
+                                 ? static_cast<HFONT>(SelectObject(draw->hDC,
+                                                                   font))
+                                 : nullptr;
             DrawTextW(draw->hDC, label, -1, &draw->rcItem,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            if (previous != nullptr) {
+                SelectObject(draw->hDC, previous);
+            }
             return TRUE;
         }
 
@@ -568,27 +978,47 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
         }
 
         case WM_KEYDOWN:
-            if (wParam == VK_F5) {
-                if (self->onReload_) {
-                    self->onReload_();
-                }
-                return 0;
-            }
-            if (wParam == VK_F11) {
-                self->toggleFullscreen();
+            if (handleControlKey(self, wParam)) {
                 return 0;
             }
             break;
 
+        case WM_CHAR: {
+            const bool altDown = (GetKeyState(VK_MENU) & 0x8000) != 0;
+            const bool ctrlDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            if (!self->overlayVisible_ && !ctrlDown && !altDown &&
+                wParam >= 0x20 && wParam <= 0x7e) {
+                self->openOverlay();
+                const wchar_t initial = static_cast<wchar_t>(wParam);
+                SetWindowTextW(self->overlayEdit_, std::wstring(1, initial).c_str());
+                SendMessageW(self->overlayEdit_, EM_SETSEL, 1, 1);
+                return 0;
+            }
+            break;
+        }
+
         case WM_DESTROY:
-            if (self->urlEdit_ != nullptr && self->originalEditProc_ != nullptr) {
-                SetWindowLongPtrW(self->urlEdit_, GWLP_WNDPROC,
-                                  reinterpret_cast<LONG_PTR>(self->originalEditProc_));
+            if (self->overlayEdit_ != nullptr &&
+                self->originalEditProc_ != nullptr) {
+                SetWindowLongPtrW(self->overlayEdit_, GWLP_WNDPROC,
+                                  reinterpret_cast<LONG_PTR>(
+                                      self->originalEditProc_));
                 self->originalEditProc_ = nullptr;
+            }
+            if (self->overlayList_ != nullptr &&
+                self->originalListProc_ != nullptr) {
+                SetWindowLongPtrW(self->overlayList_, GWLP_WNDPROC,
+                                  reinterpret_cast<LONG_PTR>(
+                                      self->originalListProc_));
+                self->originalListProc_ = nullptr;
             }
             if (self->uiFont_ != nullptr) {
                 DeleteObject(self->uiFont_);
                 self->uiFont_ = nullptr;
+            }
+            if (self->iconFont_ != nullptr) {
+                DeleteObject(self->iconFont_);
+                self->iconFont_ = nullptr;
             }
             if (self->darkBrush_ != nullptr) {
                 DeleteObject(self->darkBrush_);

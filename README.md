@@ -3,47 +3,68 @@
 ネイティブ API と OS 標準の WebView を直接制御する、超軽量のブラウザゲーム用ランチャーです。
 Electron / Tauri / Chromium の自前ビルドは使用しません。
 
-**バージョン 1.5** では、名称を **AstB3ast** に変更しました。設定・履歴・辞書は
+**バージョン 1.6** では UI を大幅変更しました。操作バーを 24 px のアイコンのみにし、
+検索・履歴をオーバーレイ化、バーを自動非表示にしています。WebView のサイズ変更は
+バーの表示状態やウィンドウサイズが実際に変わったときだけ行います。
+
+**バージョン 1.5** では名称を **AstB3ast** に変更しました。設定・履歴・辞書は
 1.5 から完全に新規のものとして扱い、旧 `CatBrowser.ini` は読み込みません。
-1.4 以前の exe は `artifacts/windows/CatBrowser-1.4.exe` /
-`CatBrowser-1.3.exe` / `CatBrowser-1.2.exe` およびタグ `v1.4` / `v1.3` / `v1.2`
-に残しています。
+1.5 の exe は `artifacts/windows/AstB3ast-1.5.exe`、1.4 以前は
+`artifacts/windows/CatBrowser-1.4.exe` / `CatBrowser-1.3.exe` /
+`CatBrowser-1.2.exe` に残しています。タグは `v1.6` / `v1.5` / `v1.4` /
+`v1.3` / `v1.2` です。
 
 > **現在の優先順位: Windows のみ。** macOS / Linux のソースは将来用に残していますが、
 > 既定ではビルド対象外です（後回し）。Windows の完成・検証を優先しています。
 
 ## 機能
 
-### 共通
+### 共通 / 軽量さ
 
-- 上部 32 px の操作バー + WebView 領域だけの最小 UI（タブ / ブックマーク / ツールバーなし）
+- 上部 24 px のアイコンバー + WebView 領域だけの最小 UI（タブ / ブックマーク / ツールバーなし）
+- バーはマウスが画面上部に近づくと表示され、入力中やオーバーレイ表示中以外は自動的に隠れる
+- 検索入力欄・履歴リストは**呼び出したときだけ作成するオーバーレイ**に集約
+- 常設コントロールは 8 個のアイコンボタンと WebView ホストのみ。テキストラベルは方向表示の `JA` / `EN` だけ
 - 何も操作していないとき（非アクティブ・最小化）は WebView を非表示にして描画処理を停止
 - メッセージループは `GetMessageW` のブロック待ち。アイドル時にタイマーやポーラーは使いません
 - バックグラウンド通信 / 同期 / 更新 / メトリクスは WebView2 起動フラグで無効化
 
-### URL / 検索入力
+### 検索・履歴オーバーレイ
 
-- `URL` / `検索` ボタンで入力欄の意味を切り替え
+オーバーレイは次のいずれかで開きます。
+
+- バーの虫眼鏡アイコンをクリック
+- `Ctrl+L`（WebView にフォーカスがあるときも有効）
+- バーにフォーカスがある状態でASCII文字を入力（その文字が入力欄に入ります）
+
+オーバーレイ内でできること:
+
+- 地球 / 虫眼鏡アイコンで `URL` / `検索` モードを切り替え
   - `URL` モード: `http://` / `https://` のみ。スキーム省略時は `https://` を補完
   - `検索` モード: 入力語を percent-encode して選択中の検索エンジンに渡す
-- スペース・引用符・`javascript:` / `file:` / `data:` などは URL モードで入力段階から拒否
-- 検索エンジンボタン（`DDG` / `Google` / `Bing`）で cycling。設定は `AstB3ast.ini` に保存
+- `D` / `G` / `B` ボタンで DuckDuckGo / Google / Bing を cycling。設定は `AstB3ast.ini` に保存
+- 直近の入力をリスト表示。クリックで入力欄に入り、ダブルクリックでそのまま遷移
 - `↑` / `↓` で直近の入力（URL・検索語）を補完。`history.txt` に最大 100 件保存
-- `Enter` : 遷移 / 検索＋即座に WebView へフォーカス移動
+- `Enter` : 遷移 / 検索＋即座に WebView へフォーカス移動してオーバーレイを閉じる
+- `Escape` : オーバーレイを閉じて WebView へ戻る
+- スペース・引用符・`javascript:` / `file:` / `data:` などは URL モードで入力段階から拒否
 - コマンドライン引数で URL を渡すことも可能: `AstB3ast https://example.com`
 
 ### ナビゲーション / 表示
 
+バーはアイコンのみです。左から虫眼鏡（検索オーバーレイ）、`←` / `→`（戻る / 進む）、
+リロード、全画面、翻訳、方向（`JA` / `EN`）、テーマの順に並びます。
+
 - `←` / `→` : 戻る / 進む（履歴がない間はボタンを無効化）
-- `再` ボタンまたは `F5` : キャッシュを無視してリロード
-- `全` ボタンまたは `F11` : URL バーを含めたボーダレス全画面の切り替え
-- `夜` / `昼` ボタン: Win32 UI と WebView の推奨カラースキームをダーク / ライトで切替。設定を保存
+- リロードアイコンまたは `F5` : キャッシュを無視してリロード
+- 全画面アイコンまたは `F11` : URL バーを含めたボーダレス全画面の切り替え
+- テーマアイコン: Win32 UI と WebView の推奨カラースキームをダーク / ライトで切替。設定を保存
 
 ### 翻訳 / ダウンロード
 
-- `訳` ボタン: 表示中のページ全体を**内蔵辞書で完全オフライン翻訳**。
+- 翻訳アイコン: 表示中のページ全体を**内蔵辞書で完全オフライン翻訳**。
   押したときだけ 1 回スクリプトを実行し、監視・タイマー・通信は一切ありません
-- 方向切替ボタン（`→JA` / `→EN`）で英日 / 日英を切り替え
+- 方向切替ボタン（`JA` / `EN`）で英日 / 日英を切り替え
 - 再翻訳時は前回の置換を元に戻してから実行するため、二重翻訳されません
 - `dict.txt` に `english<TAB>japanese` または `english=japanese` を 1 行ずつ書くと、
   起動時にユーザー辞書として読み込みます（`#` でコメント）。通信は行いません
@@ -52,7 +73,7 @@ Electron / Tauri / Chromium の自前ビルドは使用しません。
 ## 設定ファイル
 
 exe と同じフォルダーに置きます。存在しなければ既定値で動作します。
-1.5 は新規設定のみを使用し、旧 `CatBrowser.ini` からの引き継ぎは行いません。
+1.5 以降は新規設定のみを使用し、旧 `CatBrowser.ini` からの引き継ぎは行いません。
 
 `AstB3ast.ini`（UTF-8）:
 
@@ -96,10 +117,10 @@ src/
     Text.h                 UTF-8 <-> UTF-16 (Win32)
     Log.*
   win32/
-    PlatformWindow.*       Win32 ウィンドウ / 操作バー / 全画面 / 履歴補完
+    PlatformWindow.*       Win32 ウィンドウ / 24px アイコンバー / 検索オーバーレイ / 全画面
     LocalData.*            ini / history.txt / dict.txt の読み書き
     WebEngine.*            WebView2 起動・設定・ナビ・ダウンロード・テーマ
-    Version.rc.in          exe のバージョン情報 (1.5)
+    Version.rc.in          exe のバージョン情報 (1.6)
     App_win.cpp            優先度設定と配線
     GpuExports.cpp         NVIDIA / AMD の GPU 強制エクスポート
   mac/
@@ -162,7 +183,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 
 | OS | 設定 |
 |---|---|
-| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止 |
+| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止、24px アイコンバーの自動非表示、WebView サイズ変更は状態変化時のみ |
 | macOS | `NSActivityUserInitiated \| NSActivityLatencyCritical` で App Nap 無効、`nonPersistentDataStore`、`WKPreferences` の高速描画系キーを有効化、レイヤーバックトビュー |
 | Linux | `setpriority(PRIO_PROCESS, 0, -10)`、ephemeral `WebKitWebContext`、ハードウェアアクセラレーション有効化 |
 
@@ -178,7 +199,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 - 翻訳辞書はゲーム UI の定型句が中心です。`dict.txt` で補えるのはテキスト置換だけなので、
   文脈を考慮した機械翻訳ではありません。通信も初期化も行わないため待機時は完全に無負荷です。
 - 履歴はローカルファイルです。共有 PC では `history.txt` を削除すれば消せます。
-- 1.5 は旧 `CatBrowser.ini` を読み込みません。旧設定を使う場合は
+- 1.5 以降は旧 `CatBrowser.ini` を読み込みません。旧設定を使う場合は
   `AstB3ast.ini` に手動で移行してください。
 - WebView2 の `PreferredColorScheme` はページ側が独自に配色を固定している場合は効かないことがあります。
 - macOS / Linux の対応は後回しです。現状の Windows バイナリが最新です。
