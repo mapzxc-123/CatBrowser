@@ -5,7 +5,7 @@
 #include <gtk/gtk.h>
 #include <webkit2/webkit2.h>
 
-namespace catbrowser {
+namespace astb3ast {
 
 struct WebEngine::Impl {
     WebKitWebContext* context = nullptr;
@@ -13,9 +13,9 @@ struct WebEngine::Impl {
     WebKitWebView* webView = nullptr;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast
 
-namespace catbrowser {
+namespace astb3ast {
 
 WebEngine::WebEngine() : impl_(new Impl()) {}
 
@@ -90,4 +90,4 @@ void WebEngine::focus() {
     }
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

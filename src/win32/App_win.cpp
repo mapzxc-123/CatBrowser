@@ -5,7 +5,7 @@
 #include "PlatformWindow.h"
 #include "WebEngine.h"
 
-namespace catbrowser {
+namespace astb3ast {
 
 int runPlatform(const AppConfig& config) {
     // Slight boost without starving the rest of the system. HIGH_PRIORITY_CLASS
@@ -78,4 +78,4 @@ int runPlatform(const AppConfig& config) {
     return result;
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

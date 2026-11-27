@@ -6,7 +6,7 @@
 
 #include <utility>
 
-namespace catbrowser {
+namespace astb3ast {
 
 struct PlatformWindow::Impl {
     GtkWidget* window = nullptr;
@@ -101,7 +101,7 @@ bool PlatformWindow::create() {
     if (impl_->window == nullptr) {
         return false;
     }
-    gtk_window_set_title(GTK_WINDOW(impl_->window), "CatBrowser");
+    gtk_window_set_title(GTK_WINDOW(impl_->window), "AstB3ast");
     gtk_window_set_default_size(GTK_WINDOW(impl_->window), 1280, 720);
     g_signal_connect(impl_->window, "destroy",
                      G_CALLBACK(gtk_main_quit), nullptr);
@@ -168,4 +168,4 @@ void PlatformWindow::setOnReload(std::function<void()> callback) {
     impl_->onReload = std::move(callback);
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

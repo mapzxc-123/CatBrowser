@@ -1,13 +1,13 @@
-# CatBrowser
+# AstB3ast
 
 ネイティブ API と OS 標準の WebView を直接制御する、超軽量のブラウザゲーム用ランチャーです。
 Electron / Tauri / Chromium の自前ビルドは使用しません。
 
-**バージョン 1.4** では、URL / 検索のモード切替、DuckDuckGo / Google / Bing の切替、
-戻る / 進む / リロード / 全画面ボタン、ユーザー辞書、ダウンロード先設定、
-検索履歴、テーマ切替を追加しました。1.3 のオフライン翻訳とアイドル時の完全停止は維持しています。
-過去の exe は `artifacts/windows/CatBrowser-1.3.exe` / `CatBrowser-1.2.exe`
-およびタグ `v1.3` / `v1.2` に残しています。
+**バージョン 1.5** では、名称を **AstB3ast** に変更しました。設定・履歴・辞書は
+1.5 から完全に新規のものとして扱い、旧 `CatBrowser.ini` は読み込みません。
+1.4 以前の exe は `artifacts/windows/CatBrowser-1.4.exe` /
+`CatBrowser-1.3.exe` / `CatBrowser-1.2.exe` およびタグ `v1.4` / `v1.3` / `v1.2`
+に残しています。
 
 > **現在の優先順位: Windows のみ。** macOS / Linux のソースは将来用に残していますが、
 > 既定ではビルド対象外です（後回し）。Windows の完成・検証を優先しています。
@@ -27,10 +27,10 @@ Electron / Tauri / Chromium の自前ビルドは使用しません。
   - `URL` モード: `http://` / `https://` のみ。スキーム省略時は `https://` を補完
   - `検索` モード: 入力語を percent-encode して選択中の検索エンジンに渡す
 - スペース・引用符・`javascript:` / `file:` / `data:` などは URL モードで入力段階から拒否
-- 検索エンジンボタン（`DDG` / `Google` / `Bing`）で cycling。設定は `CatBrowser.ini` に保存
+- 検索エンジンボタン（`DDG` / `Google` / `Bing`）で cycling。設定は `AstB3ast.ini` に保存
 - `↑` / `↓` で直近の入力（URL・検索語）を補完。`history.txt` に最大 100 件保存
 - `Enter` : 遷移 / 検索＋即座に WebView へフォーカス移動
-- コマンドライン引数で URL を渡すことも可能: `CatBrowser https://example.com`
+- コマンドライン引数で URL を渡すことも可能: `AstB3ast https://example.com`
 
 ### ナビゲーション / 表示
 
@@ -47,18 +47,19 @@ Electron / Tauri / Chromium の自前ビルドは使用しません。
 - 再翻訳時は前回の置換を元に戻してから実行するため、二重翻訳されません
 - `dict.txt` に `english<TAB>japanese` または `english=japanese` を 1 行ずつ書くと、
   起動時にユーザー辞書として読み込みます（`#` でコメント）。通信は行いません
-- ダウンロード先は `CatBrowser.ini` の `downloaddir=` で指定。未設定なら WebView2 の既定フォルダー
+- ダウンロード先は `AstB3ast.ini` の `downloaddir=` で指定。未設定なら WebView2 の既定フォルダー
 
 ## 設定ファイル
 
 exe と同じフォルダーに置きます。存在しなければ既定値で動作します。
+1.5 は新規設定のみを使用し、旧 `CatBrowser.ini` からの引き継ぎは行いません。
 
-`CatBrowser.ini`（UTF-8）:
+`AstB3ast.ini`（UTF-8）:
 
 ```ini
 engine=ddg
 theme=dark
-downloaddir=C:\Users\user\Downloads\CatBrowser
+downloaddir=C:\Users\user\Downloads\AstB3ast
 ```
 
 - `engine`: `ddg` / `google` / `bing`
@@ -69,14 +70,14 @@ downloaddir=C:\Users\user\Downloads\CatBrowser
 
 ```text
 https://example.com/
-cat browser launcher
+ast browser launcher
 ```
 
 `dict.txt`（UTF-8、1 行 1 組）:
 
 ```text
 # english<TAB>japanese
-high score	ハイスコア
+high score\tハイスコア
 insert coin=コインを入れる
 ```
 
@@ -98,7 +99,7 @@ src/
     PlatformWindow.*       Win32 ウィンドウ / 操作バー / 全画面 / 履歴補完
     LocalData.*            ini / history.txt / dict.txt の読み書き
     WebEngine.*            WebView2 起動・設定・ナビ・ダウンロード・テーマ
-    Version.rc.in          exe のバージョン情報 (1.4)
+    Version.rc.in          exe のバージョン情報 (1.5)
     App_win.cpp            優先度設定と配線
     GpuExports.cpp         NVIDIA / AMD の GPU 強制エクスポート
   mac/
@@ -124,12 +125,12 @@ Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -O
 # CMakePresets を使う場合（推奨）
 cmake --preset windows-release
 cmake --build --preset windows-release
-# build\windows\Release\CatBrowser.exe
+# build\windows\Release\AstB3ast.exe
 
 # または直接
 cmake -S . -B build -A x64
 cmake --build build --config Release --parallel
-# build\Release\CatBrowser.exe
+# build\Release\AstB3ast.exe
 ```
 
 VS Code は CMake Tools 拡張で `windows-release` プリセットを選択すればそのままビルドできます
@@ -141,17 +142,17 @@ WebView2Loader は静的リンクされるため、実行ファイル本体は�
 
 ### macOS / Linux を再開するとき
 
-既定では `CATBROWSER_WINDOWS_ONLY=ON` のため、非 Windows ホストではターゲットが作られません。
-再開する場合は明示的に OFF を指定します。なお 1.4 の検索 / 設定機能は Win32 実装です。
+既定では `ASTB3AST_WINDOWS_ONLY=ON` のため、非 Windows ホストではターゲットが作られません。
+再開する場合は明示的に OFF を指定します。なお検索 / 設定機能は Win32 実装です。
 
 ```sh
-cmake -S . -B build -DCATBROWSER_WINDOWS_ONLY=OFF -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DASTB3AST_WINDOWS_ONLY=OFF -DCMAKE_BUILD_TYPE=Release
 ```
 
 ## CI
 
 push / pull_request では **Windows ジョブのみ**が実行され、
-`CatBrowser-Windows-x64` Artifact（`CatBrowser.exe`）がアップロードされます。
+`AstB3ast-Windows-x64` Artifact（`AstB3ast.exe`）がアップロードされます。
 WebView2 SDK は NuGet から自動取得します。
 
 macOS / Linux ジョブはソースごと残していますが、`workflow_dispatch` で
@@ -177,5 +178,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 - 翻訳辞書はゲーム UI の定型句が中心です。`dict.txt` で補えるのはテキスト置換だけなので、
   文脈を考慮した機械翻訳ではありません。通信も初期化も行わないため待機時は完全に無負荷です。
 - 履歴はローカルファイルです。共有 PC では `history.txt` を削除すれば消せます。
+- 1.5 は旧 `CatBrowser.ini` を読み込みません。旧設定を使う場合は
+  `AstB3ast.ini` に手動で移行してください。
 - WebView2 の `PreferredColorScheme` はページ側が独自に配色を固定している場合は効かないことがあります。
-- macOS / Linux の 1.4 対応は後回しです。現状の Windows バイナリが最新です。
+- macOS / Linux の対応は後回しです。現状の Windows バイナリが最新です。

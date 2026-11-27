@@ -16,16 +16,16 @@
 - (void)applicationDidFinishLaunching:(NSNotification*)notification {
     (void)notification;
 
-    auto* window = static_cast<catbrowser::PlatformWindow*>(self.windowPtr);
-    auto* engine = static_cast<catbrowser::WebEngine*>(self.enginePtr);
+    auto* window = static_cast<astb3ast::PlatformWindow*>(self.windowPtr);
+    auto* engine = static_cast<astb3ast::WebEngine*>(self.enginePtr);
 
     // No nib: create a minimal menu so the app can be quit from the Dock.
     NSMenu* mainMenu = [[NSMenu alloc] initWithTitle:@"MainMenu"];
-    NSMenuItem* appItem = [[NSMenuItem alloc] initWithTitle:@"CatBrowser"
+    NSMenuItem* appItem = [[NSMenuItem alloc] initWithTitle:@"AstB3ast"
                                                      action:nil
                                               keyEquivalent:@""];
-    NSMenu* appMenu = [[NSMenu alloc] initWithTitle:@"CatBrowser"];
-    [appMenu addItemWithTitle:@"Quit CatBrowser"
+    NSMenu* appMenu = [[NSMenu alloc] initWithTitle:@"AstB3ast"];
+    [appMenu addItemWithTitle:@"Quit AstB3ast"
                        action:@selector(terminate:)
                 keyEquivalent:@"q"];
     [appItem setSubmenu:appMenu];
@@ -69,7 +69,7 @@
 
 @end
 
-namespace catbrowser {
+namespace astb3ast {
 
 int runPlatform(const AppConfig& config) {
     @autoreleasepool {
@@ -81,7 +81,7 @@ int runPlatform(const AppConfig& config) {
             NSActivityUserInitiated | NSActivityLatencyCritical;
         id<NSObject> activity =
             [[NSProcessInfo processInfo] beginActivityWithOptions:options
-                                                           reason:@"CatBrowser latency-critical rendering"];
+                                                           reason:@"AstB3ast latency-critical rendering"];
 
         PlatformWindow window(config.initialUrl);
         WebEngine engine;
@@ -108,4 +108,4 @@ int runPlatform(const AppConfig& config) {
     }
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

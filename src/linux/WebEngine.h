@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // WebKitGTK wrapper: ephemeral website data manager + forced GPU rendering.
 class WebEngine {
@@ -25,4 +25,4 @@ private:
     Impl* impl_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

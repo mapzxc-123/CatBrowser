@@ -4,15 +4,15 @@
 #include "WebEngine.h"
 #include "../common/UrlUtils.h"
 
-namespace catbrowser {
+namespace astb3ast {
 
 struct WebEngine::Impl {
     __strong WKWebView* webView = nil;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast
 
-namespace catbrowser {
+namespace astb3ast {
 
 WebEngine::WebEngine() : impl_(new Impl()) {}
 
@@ -111,4 +111,4 @@ void WebEngine::focus() {
     [impl_->webView becomeFirstResponder];
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

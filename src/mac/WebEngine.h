@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // WKWebView wrapper using an in-memory-only website data store.
 class WebEngine {
@@ -25,4 +25,4 @@ private:
     Impl* impl_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

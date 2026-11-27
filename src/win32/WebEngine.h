@@ -14,7 +14,7 @@
 #include <wrl.h>
 #include <WebView2.h>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // Thin wrapper around the Win32 WebView2 API. The loader is linked statically
 // so the final artifact is a single .exe (apart from the WebView2 Runtime).
@@ -72,4 +72,4 @@ private:
     std::function<void(bool, bool)> onNavigationStateChanged_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

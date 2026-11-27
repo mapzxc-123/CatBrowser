@@ -7,7 +7,7 @@
 
 @class CBAppBridge;
 
-namespace catbrowser {
+namespace astb3ast {
 
 struct PlatformWindow::Impl {
     __strong CBAppBridge* bridge = nil;
@@ -24,7 +24,7 @@ struct PlatformWindow::Impl {
     std::function<void()> onReload;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast
 
 @interface CBAppBridge : NSObject <NSWindowDelegate>
 @property (nonatomic, assign) void* impl;
@@ -36,13 +36,13 @@ struct PlatformWindow::Impl {
 @implementation CBAppBridge
 
 - (void)submit:(id)sender {
-    auto* impl = static_cast<catbrowser::PlatformWindow::Impl*>(self.impl);
+    auto* impl = static_cast<astb3ast::PlatformWindow::Impl*>(self.impl);
     if (impl == nil) {
         return;
     }
     NSString* value = self.urlField.stringValue;
     const char* utf8 = value != nil ? [value UTF8String] : nullptr;
-    const std::string url = catbrowser::url::normalize(utf8 != nullptr ? utf8 : "");
+    const std::string url = astb3ast::url::normalize(utf8 != nullptr ? utf8 : "");
     if (url.empty()) {
         NSBeep();
         return;
@@ -53,7 +53,7 @@ struct PlatformWindow::Impl {
 }
 
 - (void)reloadPressed:(id)sender {
-    auto* impl = static_cast<catbrowser::PlatformWindow::Impl*>(self.impl);
+    auto* impl = static_cast<astb3ast::PlatformWindow::Impl*>(self.impl);
     if (impl != nil && impl->onReload) {
         impl->onReload();
     }
@@ -61,7 +61,7 @@ struct PlatformWindow::Impl {
 
 @end
 
-namespace catbrowser {
+namespace astb3ast {
 
 PlatformWindow::PlatformWindow(const std::string& initialUrl)
     : impl_(new Impl()) {
@@ -100,7 +100,7 @@ bool PlatformWindow::create() {
         if (window == nil) {
             return false;
         }
-        window.title = @"CatBrowser";
+        window.title = @"AstB3ast";
         window.delegate = impl_->bridge;
         [window center];
         impl_->window = window;
@@ -189,4 +189,4 @@ void PlatformWindow::setOnReload(std::function<void()> callback) {
     impl_->onReload = std::move(callback);
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

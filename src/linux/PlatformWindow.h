@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // GTK3 window: 30px URL bar + GO button + a vertical slot for WebKitWebView.
 class PlatformWindow {
@@ -29,4 +29,4 @@ private:
     Impl* impl_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

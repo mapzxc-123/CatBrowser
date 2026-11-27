@@ -5,7 +5,7 @@
 #include "PlatformWindow.h"
 #include "WebEngine.h"
 
-namespace catbrowser {
+namespace astb3ast {
 
 int runPlatform(const AppConfig& config) {
     // Needs CAP_SYS_NICE or a raised RLIMIT_NICE; otherwise we simply keep
@@ -34,4 +34,4 @@ int runPlatform(const AppConfig& config) {
     return 0;
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

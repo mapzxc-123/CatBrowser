@@ -15,7 +15,7 @@
       },
       "binaryDir": "${sourceDir}/build/windows",
       "cacheVariables": {
-        "CATBROWSER_WINDOWS_ONLY": "ON"
+        "ASTB3AST_WINDOWS_ONLY": "ON"
       }
     },
     {

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace catbrowser::url {
+namespace astb3ast::url {
 namespace {
 
 bool startsWithIgnoreCase(std::string_view value, std::string_view prefix) {
@@ -66,4 +66,4 @@ bool isAllowed(std::string_view value) {
            startsWithIgnoreCase(value, "http://");
 }
 
-} // namespace catbrowser::url
+} // namespace astb3ast::url

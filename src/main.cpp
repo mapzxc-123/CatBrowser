@@ -29,27 +29,27 @@ void enableDpiAwareness() {
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     enableDpiAwareness();
 
-    catbrowser::AppConfig config;
+    astb3ast::AppConfig config;
     config.nativeInstance = hInstance;
 
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv != nullptr) {
         if (argc > 1) {
-            config.initialUrl = catbrowser::text::wideToUtf8(argv[1]);
+            config.initialUrl = astb3ast::text::wideToUtf8(argv[1]);
         }
         LocalFree(argv);
     }
 
-    return catbrowser::runPlatform(config);
+    return astb3ast::runPlatform(config);
 }
 #else
 
 int main(int argc, char** argv) {
-    catbrowser::AppConfig config;
+    astb3ast::AppConfig config;
     if (argc > 1) {
         config.initialUrl = argv[1];
     }
-    return catbrowser::runPlatform(config);
+    return astb3ast::runPlatform(config);
 }
 #endif

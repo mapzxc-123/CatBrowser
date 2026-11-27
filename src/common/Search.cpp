@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <string_view>
 
-namespace catbrowser::search {
+namespace astb3ast::search {
 namespace {
 
 bool isUnreserved(unsigned char c) {
@@ -80,4 +80,4 @@ std::string buildUrl(Engine engine, const std::string& query) {
     }
 }
 
-} // namespace catbrowser::search
+} // namespace astb3ast::search

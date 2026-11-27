@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-namespace catbrowser::translation {
+namespace astb3ast::translation {
 
 enum class Direction {
     ToJapanese,
@@ -25,4 +25,4 @@ std::string buildTranslateScript(Direction direction);
 // Restores text nodes changed by buildTranslateScript().
 std::string buildRestoreScript();
 
-} // namespace catbrowser::translation
+} // namespace astb3ast::translation

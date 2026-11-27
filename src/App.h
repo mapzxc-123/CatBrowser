@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // Platform-independent launch configuration.
 struct AppConfig {
@@ -16,4 +16,4 @@ struct AppConfig {
 // Implemented exactly once per platform (App_win.cpp / App_mac.mm / App_linux.cpp).
 int runPlatform(const AppConfig& config);
 
-} // namespace catbrowser
+} // namespace astb3ast

@@ -15,11 +15,11 @@
 #if defined(__has_include)
 #if __has_include(<WebView2EnvironmentOptions.h>)
 #include <WebView2EnvironmentOptions.h>
-#define CATBROWSER_WV2_MODERN_OPTIONS 1
+#define ASTB3AST_WV2_MODERN_OPTIONS 1
 #endif
 #endif
 
-namespace catbrowser {
+namespace astb3ast {
 namespace {
 
 // Keep only the switches that actually help: GPU acceleration plus removal of
@@ -47,9 +47,9 @@ std::wstring userDataFolder() {
     wchar_t temp[MAX_PATH]{};
     const DWORD length = GetTempPathW(MAX_PATH, temp);
     if (length == 0 || length >= MAX_PATH) {
-        return L"C:\\CatBrowserWebView2";
+        return L"C:\\AstB3astWebView2";
     }
-    return std::wstring(temp) + L"CatBrowser\\WebView2";
+    return std::wstring(temp) + L"AstB3ast\\WebView2";
 }
 
 } // namespace
@@ -58,7 +58,7 @@ bool WebEngine::create(HWND host, const std::string& initialUrl) {
     host_ = host;
     pendingUrl_ = url::normalize(initialUrl);
 
-#ifdef CATBROWSER_WV2_MODERN_OPTIONS
+#ifdef ASTB3AST_WV2_MODERN_OPTIONS
     auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
     if (!options) {
         log::warn("Could not create CoreWebView2EnvironmentOptions");
@@ -83,7 +83,7 @@ bool WebEngine::create(HWND host, const std::string& initialUrl) {
                     MessageBoxW(nullptr,
                                 L"This launcher needs the Microsoft Edge WebView2 Runtime.\n"
                                 L"Please install the Evergreen Runtime and restart.",
-                                L"CatBrowser", MB_ICONERROR | MB_OK);
+                                L"AstB3ast", MB_ICONERROR | MB_OK);
                     return result;
                 }
 
@@ -374,4 +374,4 @@ void WebEngine::translate(translation::Direction direction) {
             [](HRESULT, LPCWSTR) -> HRESULT { return S_OK; }).Get());
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

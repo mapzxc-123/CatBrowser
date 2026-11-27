@@ -8,11 +8,11 @@
 #include <fstream>
 #include <string_view>
 
-namespace catbrowser::localdata {
+namespace astb3ast::localdata {
 namespace {
 
 constexpr size_t kMaxHistoryEntries = 100;
-constexpr const char* kSettingsFile = "CatBrowser.ini";
+constexpr const char* kSettingsFile = "AstB3ast.ini";
 constexpr const char* kHistoryFile = "history.txt";
 constexpr const char* kDictionaryFile = "dict.txt";
 
@@ -169,4 +169,4 @@ std::vector<std::pair<std::string, std::string>> loadUserDictionary() {
     return entries;
 }
 
-} // namespace catbrowser::localdata
+} // namespace astb3ast::localdata

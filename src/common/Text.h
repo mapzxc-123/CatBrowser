@@ -9,7 +9,7 @@
 #endif
 #include <windows.h>
 
-namespace catbrowser::text {
+namespace astb3ast::text {
 
 inline std::string wideToUtf8(std::wstring_view input) {
     if (input.empty()) {
@@ -45,5 +45,5 @@ inline std::wstring utf8ToWide(std::string_view input) {
     return result;
 }
 
-} // namespace catbrowser::text
+} // namespace astb3ast::text
 #endif

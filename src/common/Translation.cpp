@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace catbrowser::translation {
+namespace astb3ast::translation {
 namespace {
 
 // Small, offline EN <-> JA dictionary focused on browser-game UI wording.
@@ -208,7 +208,7 @@ std::string buildPairs(Direction direction) {
 constexpr const char* kTranslateScript = R"JS(
 (function(){
 try{
-if(window.__catbrowserRestore){window.__catbrowserRestore();}
+if(window.__astb3astRestore){window.__astb3astRestore();}
 var pairs=PAIRS;
 var escapeRegExp=function(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');};
 var isAscii=/^[A-Za-z0-9 ]+$/;
@@ -229,11 +229,11 @@ output=output.replace(new RegExp(pattern,flags),value);
 }
 if(output!==text){changed.push([node,text]);node.nodeValue=output;}
 }
-window.__catbrowserTranslation=changed;
-window.__catbrowserRestore=function(){
-var list=window.__catbrowserTranslation||[];
+window.__astb3astTranslation=changed;
+window.__astb3astRestore=function(){
+var list=window.__astb3astTranslation||[];
 for(var i=0;i<list.length;i++){try{list[i][0].nodeValue=list[i][1];}catch(e){}}
-window.__catbrowserTranslation=[];
+window.__astb3astTranslation=[];
 };
 }catch(e){}
 })();
@@ -251,11 +251,11 @@ std::string buildTranslateScript(Direction direction) {
 }
 
 std::string buildRestoreScript() {
-    return "(function(){if(window.__catbrowserRestore){window.__catbrowserRestore();}})();";
+    return "(function(){if(window.__astb3astRestore){window.__astb3astRestore();}})();";
 }
 
 void setUserEntries(std::vector<Entry> entries) {
     g_userEntries = std::move(entries);
 }
 
-} // namespace catbrowser::translation
+} // namespace astb3ast::translation

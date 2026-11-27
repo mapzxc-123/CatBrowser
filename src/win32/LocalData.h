@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-namespace catbrowser::localdata {
+namespace astb3ast::localdata {
 
 struct Settings {
     search::Engine engine = search::Engine::DuckDuckGo;
@@ -14,7 +14,7 @@ struct Settings {
     std::wstring downloadDir; // empty means WebView2's default Downloads folder
 };
 
-// All files are plain UTF-8 and live next to CatBrowser.exe.
+// All files are plain UTF-8 and live next to AstB3ast.exe.
 Settings loadSettings();
 void saveSettings(const Settings& settings);
 
@@ -27,4 +27,4 @@ std::vector<std::wstring> addHistory(const std::string& entry);
 // with '#' are comments. Returned pairs are UTF-8 EN -> JA entries.
 std::vector<std::pair<std::string, std::string>> loadUserDictionary();
 
-} // namespace catbrowser::localdata
+} // namespace astb3ast::localdata

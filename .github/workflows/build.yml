@@ -45,13 +45,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/windows | Out-Null
-          Copy-Item "build/Release/CatBrowser.exe" artifacts/windows/
+          Copy-Item "build/Release/AstB3ast.exe" artifacts/windows/
           Get-ChildItem artifacts/windows | Format-Table Name,Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CatBrowser-Windows-x64
+          name: AstB3ast-Windows-x64
           path: artifacts/windows/*
           if-no-files-found: error
 
@@ -66,7 +66,7 @@ jobs:
       - name: Configure (universal binary)
         run: >
           cmake -S . -B build
-          -DCATBROWSER_WINDOWS_ONLY=OFF
+          -DASTB3AST_WINDOWS_ONLY=OFF
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
@@ -77,13 +77,13 @@ jobs:
         run: |
           mkdir -p artifacts/macos
           ditto -c -k --sequesterRsrc --keepParent \
-            build/CatBrowser.app artifacts/macos/CatBrowser-macos.zip
+            build/AstB3ast.app artifacts/macos/AstB3ast-macos.zip
           ls -lh artifacts/macos
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CatBrowser-macOS-universal
+          name: AstB3ast-macOS-universal
           path: artifacts/macos/*
           if-no-files-found: error
 
@@ -105,7 +105,7 @@ jobs:
           fi
 
       - name: Configure
-        run: cmake -S . -B build -DCATBROWSER_WINDOWS_ONLY=OFF -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DASTB3AST_WINDOWS_ONLY=OFF -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --parallel
@@ -113,13 +113,13 @@ jobs:
       - name: Stage artifact
         run: |
           mkdir -p artifacts/linux
-          cp build/CatBrowser artifacts/linux/
-          ldd artifacts/linux/CatBrowser || true
+          cp build/AstB3ast artifacts/linux/
+          ldd artifacts/linux/AstB3ast || true
           ls -lh artifacts/linux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CatBrowser-Linux-x64
+          name: AstB3ast-Linux-x64
           path: artifacts/linux/*
           if-no-files-found: error

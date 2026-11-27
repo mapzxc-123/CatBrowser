@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // Pure Win32 window: a compact 32px control bar + a child HWND used as the
 // WebView2 host. No toolbars, tabs, bookmarks or other browser UI.
@@ -31,7 +31,7 @@ public:
 
     void toggleFullscreen();
 
-    // 1.4 UI state, restored from CatBrowser.ini at startup.
+    // UI state, restored from AstB3ast.ini at startup.
     void setEngine(search::Engine engine);
     void setTheme(bool dark);
     void setHistory(std::vector<std::wstring> history) {
@@ -126,4 +126,4 @@ private:
     std::function<void(bool)> onThemeChanged_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

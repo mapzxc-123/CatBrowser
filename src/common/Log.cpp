@@ -9,16 +9,16 @@
 #include <windows.h>
 #endif
 
-namespace catbrowser::log {
+namespace astb3ast::log {
 namespace {
 
 void write(const char* level, const char* message) {
 #if defined(_WIN32)
     char buffer[1024];
-    std::snprintf(buffer, sizeof(buffer), "[CatBrowser][%s] %s\n", level, message);
+    std::snprintf(buffer, sizeof(buffer), "[AstB3ast][%s] %s\n", level, message);
     OutputDebugStringA(buffer);
 #else
-    std::fprintf(stderr, "[CatBrowser][%s] %s\n", level, message);
+    std::fprintf(stderr, "[AstB3ast][%s] %s\n", level, message);
 #endif
 }
 
@@ -27,4 +27,4 @@ void write(const char* level, const char* message) {
 void info(const char* message) { write("INFO", message); }
 void warn(const char* message) { write("WARN", message); }
 
-} // namespace catbrowser::log
+} // namespace astb3ast::log

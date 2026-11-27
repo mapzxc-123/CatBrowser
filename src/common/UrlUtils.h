@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-namespace catbrowser::url {
+namespace astb3ast::url {
 
 // Adds only an https:// default scheme. Never consults a search engine.
 // Returns an empty string for anything that is not a plain http(s) URL
@@ -12,4 +12,4 @@ std::string normalize(std::string_view input);
 
 bool isAllowed(std::string_view url);
 
-} // namespace catbrowser::url
+} // namespace astb3ast::url

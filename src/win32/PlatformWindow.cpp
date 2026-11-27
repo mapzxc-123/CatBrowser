@@ -9,7 +9,7 @@
 #include <cwctype>
 #include <iterator>
 
-namespace catbrowser {
+namespace astb3ast {
 namespace {
 
 constexpr int kUrlBarHeight = 32;
@@ -37,7 +37,7 @@ constexpr int kThemeButtonId = 110;
 PlatformWindow* g_activeWindow = nullptr;
 
 std::wstring className() {
-    return L"CatBrowserWindowClass";
+    return L"AstB3astWindowClass";
 }
 
 HWND createButton(HINSTANCE instance, HWND parent, const wchar_t* label, int id) {
@@ -113,7 +113,7 @@ bool PlatformWindow::create() {
     lightBrush_ = CreateSolidBrush(RGB(255, 255, 255));
 
     hwnd_ = CreateWindowExW(
-        0, className().c_str(), L"CatBrowser",
+        0, className().c_str(), L"AstB3ast",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
         nullptr, nullptr, instance_, this);
@@ -612,4 +612,4 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
     return DefWindowProcW(hwnd, message, wParam, lParam);
 }
 
-} // namespace catbrowser
+} // namespace astb3ast

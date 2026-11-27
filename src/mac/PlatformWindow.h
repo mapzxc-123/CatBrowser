@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace catbrowser {
+namespace astb3ast {
 
 // Cocoa window: 30pt URL bar + GO button + a layer-backed WKWebView container.
 // The implementation lives in PlatformWindow.mm (Objective-C++).
@@ -30,4 +30,4 @@ private:
     Impl* impl_;
 };
 
-} // namespace catbrowser
+} // namespace astb3ast

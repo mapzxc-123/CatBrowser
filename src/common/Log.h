@@ -1,8 +1,8 @@
 #pragma once
 
-namespace catbrowser::log {
+namespace astb3ast::log {
 
 void info(const char* message);
 void warn(const char* message);
 
-} // namespace catbrowser::log
+} // namespace astb3ast::log
