@@ -88,7 +88,7 @@ private:
     void applyLayout();
     void setBarVisible(bool visible);
     void revealBar();
-    void maybeAutoHideBar();
+    void maybeAutoHideBar(int clientY = -1);
     void ensureOverlay();
     void positionOverlay();
     void showOverlayControls(bool visible);

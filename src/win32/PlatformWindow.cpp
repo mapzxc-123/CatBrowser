@@ -207,7 +207,7 @@ int PlatformWindow::messageLoop() {
                 if (point.y <= kRevealZone) {
                     revealBar();
                 } else if (point.y > kBarHeight + kKeepVisibleZone) {
-                    maybeAutoHideBar();
+                    maybeAutoHideBar(point.y);
                 }
             }
         }
@@ -499,15 +499,18 @@ void PlatformWindow::revealBar() {
     }
 }
 
-void PlatformWindow::maybeAutoHideBar() {
+void PlatformWindow::maybeAutoHideBar(int clientY) {
     if (!barVisible_ || overlayVisible_ || editFocused_ || hwnd_ == nullptr) {
         return;
     }
-    POINT point{};
-    if (!GetCursorPos(&point) || !ScreenToClient(hwnd_, &point)) {
-        return;
+    if (clientY < 0) {
+        POINT point{};
+        if (!GetCursorPos(&point) || !ScreenToClient(hwnd_, &point)) {
+            return;
+        }
+        clientY = point.y;
     }
-    if (point.y > kBarHeight + kKeepVisibleZone) {
+    if (clientY > kBarHeight + kKeepVisibleZone) {
         setBarVisible(false);
     }
 }
@@ -821,7 +824,7 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             if (y <= kRevealZone) {
                 self->revealBar();
             } else if (y > kBarHeight + kKeepVisibleZone) {
-                self->maybeAutoHideBar();
+                self->maybeAutoHideBar(y);
             }
             break;
         }
