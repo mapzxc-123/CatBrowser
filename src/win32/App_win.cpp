@@ -18,6 +18,13 @@ int runPlatform(const AppConfig& config) {
     PlatformWindow window(static_cast<HINSTANCE>(config.nativeInstance));
     WebEngine engine;
 
+    // WebView2 process startup is the slowest part of a cold launch. Start it
+    // now so it overlaps native window and control creation.
+    if (!engine.preinitialize()) {
+        CoUninitialize();
+        return 1;
+    }
+
     if (!window.create()) {
         log::warn("Failed to create the Win32 window");
         CoUninitialize();
@@ -72,7 +79,7 @@ int runPlatform(const AppConfig& config) {
         window.setNavigationState(canBack, canForward);
     });
 
-    engine.create(window.webHost(), config.initialUrl);
+    engine.attach(window.webHost(), config.initialUrl);
 
     const int result = window.messageLoop();
 

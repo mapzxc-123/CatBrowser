@@ -3,6 +3,12 @@
 ネイティブ API と OS 標準の WebView を直接制御する、超軽量のブラウザゲーム用ランチャーです。
 Electron / Tauri / Chromium の自前ビルドは使用しません。
 
+**バージョン 1.7** では読み込みの遅さを改善しました。WebView2 の起動をネイティブ UI の
+準備と並行して開始し、ユーザーデータフォルダーを `%LOCALAPPDATA%\AstB3ast\WebView2` に
+移動（`%TEMP%` のクリーンアップによる毎回のコールド起動を回避）、初回ナビゲーションで
+WPAD 探索が長時間停留する問題を回避するプロキシ解決フラグを追加しました。
+GPU 関係の開発用フラグも外し、ページ要求を UI ハンドラーの登録より先に開始します。
+
 **バージョン 1.6** では UI を大幅変更しました。操作バーを 24 px のアイコンのみにし、
 検索・履歴をオーバーレイ化、バーを自動非表示にしています。WebView のサイズ変更は
 バーの表示状態やウィンドウサイズが実際に変わったときだけ行います。
@@ -11,8 +17,8 @@ Electron / Tauri / Chromium の自前ビルドは使用しません。
 1.5 から完全に新規のものとして扱い、旧 `CatBrowser.ini` は読み込みません。
 1.5 の exe は `artifacts/windows/AstB3ast-1.5.exe`、1.4 以前は
 `artifacts/windows/CatBrowser-1.4.exe` / `CatBrowser-1.3.exe` /
-`CatBrowser-1.2.exe` に残しています。タグは `v1.6` / `v1.5` / `v1.4` /
-`v1.3` / `v1.2` です。
+`CatBrowser-1.2.exe` に残しています。タグは `v1.7` / `v1.6` / `v1.5` /
+`v1.4` / `v1.3` / `v1.2` です。
 
 > **現在の優先順位: Windows のみ。** macOS / Linux のソースは将来用に残していますが、
 > 既定ではビルド対象外です（後回し）。Windows の完成・検証を優先しています。
@@ -121,7 +127,7 @@ src/
     PlatformWindow.*       Win32 ウィンドウ / 24px アイコンバー / 検索オーバーレイ / 全画面
     LocalData.*            ini / history.txt / dict.txt の読み書き
     WebEngine.*            WebView2 起動・設定・ナビ・ダウンロード・テーマ
-    Version.rc.in          exe のバージョン情報 (1.6)
+    Version.rc.in          exe のバージョン情報 (CMake のプロジェクトバージョン)
     App_win.cpp            優先度設定と配線
     GpuExports.cpp         NVIDIA / AMD の GPU 強制エクスポート
   mac/
@@ -184,7 +190,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 
 | OS | 設定 |
 |---|---|
-| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止、24px アイコンバーの自動非表示（Raw Input、タイマーなし）、WebView サイズ変更は状態変化時のみ |
+| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、WebView2 起動をネイティブ準備と並行実行、`%LOCALAPPDATA%` の安定した UDF、不要な背景処理と WPAD 停留を避ける Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止、24px アイコンバーの自動非表示（Raw Input、タイマーなし）、WebView サイズ変更は状態変化時のみ |
 | macOS | `NSActivityUserInitiated \| NSActivityLatencyCritical` で App Nap 無効、`nonPersistentDataStore`、`WKPreferences` の高速描画系キーを有効化、レイヤーバックトビュー |
 | Linux | `setpriority(PRIO_PROCESS, 0, -10)`、ephemeral `WebKitWebContext`、ハードウェアアクセラレーション有効化 |
 
@@ -195,8 +201,8 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
   このランチャーだけでは完全にゼロにはできません。
 - WebView2 のブラウザフラグは Microsoft が長期サポートを保証しない開発用フラグです。
   Runtime のバージョンによっては無視されます。
-- `--disable-frame-rate-limit` や背景スロットリング無効化は「重い」原因になるため
-  意図的に外しています。GPU 加速は `ignore-gpu-blocklist` / `use-angle=d3d11` で維持します。
+- `--disable-frame-rate-limit` / 背景スロットリング無効化 / GPU 強制フラグは
+  「重い」原因になるため意図的に外しています。WebView2 の既定の GPU 設定を使います。
 - 翻訳辞書はゲーム UI の定型句が中心です。`dict.txt` で補えるのはテキスト置換だけなので、
   文脈を考慮した機械翻訳ではありません。通信も初期化も行わないため待機時は完全に無負荷です。
 - 履歴はローカルファイルです。共有 PC では `history.txt` を削除すれば消せます。

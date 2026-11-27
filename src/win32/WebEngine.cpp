@@ -22,18 +22,21 @@
 namespace astb3ast {
 namespace {
 
-// Keep only the switches that actually help: GPU acceleration plus removal of
-// background work we never use. Deliberately NOT set:
-//   --disable-frame-rate-limit       (pegs the GPU/CPU even while idle)
+// Keep only switches that remove work we never use or avoid known startup
+// stalls. --use-system-proxy-resolver uses WinHttp instead of Chromium's WPAD
+// probing, which can otherwise delay the very first navigation by many seconds
+// on networks with a broken auto-detection setup.
+//
+// Deliberately NOT set:
+//   GPU blocklist/rasterizer/ANGLE overrides (unsupported flags that can make
+//                                             hybrid-GPU startup slower)
+//   --disable-frame-rate-limit                (pegs the GPU/CPU even while idle)
 //   --disable-background-timer-throttling / --disable-renderer-backgrounding
-//   --process-per-site               (extra browser processes)
-//   --disable-dev-shm-usage          (forces disk I/O instead of shared memory)
+//   --process-per-site                        (extra browser processes)
+//   --disable-dev-shm-usage                   (forces disk I/O instead of shared memory)
 // Browser flags are not a long-term supported WebView2 API and may be ignored
 // by the runtime; they are injected via the documented AdditionalBrowserArguments.
 constexpr wchar_t kBrowserArguments[] =
-    L"--ignore-gpu-blocklist "
-    L"--enable-gpu-rasterization "
-    L"--use-angle=d3d11 "
     L"--disable-background-networking "
     L"--disable-component-update "
     L"--disable-domain-reliability "
@@ -41,12 +44,23 @@ constexpr wchar_t kBrowserArguments[] =
     L"--disable-default-apps "
     L"--no-first-run "
     L"--metrics-recording-only "
+    L"--use-system-proxy-resolver "
     L"--disable-features=Translate,BackForwardCache,OptimizationHints,MediaRouter";
 
+// Microsoft recommends a stable local app data folder for the WebView2 user
+// data folder. %TEMP% is frequently cleaned by disk-cleanup tools, which turns
+// every launch into a cold WebView2 start and makes loading feel very slow.
 std::wstring userDataFolder() {
+    wchar_t localAppData[MAX_PATH]{};
+    const DWORD length =
+        GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (length > 0 && length < MAX_PATH) {
+        return std::wstring(localAppData) + L"\\AstB3ast\\WebView2";
+    }
+
     wchar_t temp[MAX_PATH]{};
-    const DWORD length = GetTempPathW(MAX_PATH, temp);
-    if (length == 0 || length >= MAX_PATH) {
+    const DWORD tempLength = GetTempPathW(MAX_PATH, temp);
+    if (tempLength == 0 || tempLength >= MAX_PATH) {
         return L"C:\\AstB3astWebView2";
     }
     return std::wstring(temp) + L"AstB3ast\\WebView2";
@@ -54,9 +68,11 @@ std::wstring userDataFolder() {
 
 } // namespace
 
-bool WebEngine::create(HWND host, const std::string& initialUrl) {
-    host_ = host;
-    pendingUrl_ = url::normalize(initialUrl);
+bool WebEngine::preinitialize() {
+    if (environmentStarted_) {
+        return true;
+    }
+    environmentStarted_ = true;
 
 #ifdef ASTB3AST_WV2_MODERN_OPTIONS
     auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
@@ -88,40 +104,74 @@ bool WebEngine::create(HWND host, const std::string& initialUrl) {
                 }
 
                 environment_ = environment;
-                return environment->CreateCoreWebView2Controller(
-                    host_,
-                    Microsoft::WRL::Callback<
-                        ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                        [this](HRESULT controllerResult,
-                               ICoreWebView2Controller* controller) -> HRESULT {
-                            if (FAILED(controllerResult) || controller == nullptr) {
-                                log::warn("WebView2 controller creation failed");
-                                return controllerResult;
-                            }
-
-                            controller_ = controller;
-                            controller_->get_CoreWebView2(webView_.GetAddressOf());
-                            applySettings();
-                            registerAccelerators();
-                            registerNavigationObserver();
-                            applyTheme();
-                            registerDownloadHandler();
-
-                            RECT bounds{};
-                            GetClientRect(host_, &bounds);
-                            controller_->put_Bounds(bounds);
-                            controller_->put_IsVisible(TRUE);
-
-                            if (!pendingUrl_.empty()) {
-                                navigate(pendingUrl_);
-                                pendingUrl_.clear();
-                            }
-                            return S_OK;
-                        }).Get());
+                // attach() may still be setting up native controls. The
+                // controller is created as soon as the host HWND is available.
+                if (host_ != nullptr) {
+                    return createController() ? S_OK : E_FAIL;
+                }
+                return S_OK;
             }).Get());
 
     if (FAILED(hr)) {
         log::warn("Failed to start WebView2 environment creation");
+        return false;
+    }
+    return true;
+}
+
+bool WebEngine::attach(HWND host, const std::string& initialUrl) {
+    host_ = host;
+    pendingUrl_ = url::normalize(initialUrl);
+    return createController();
+}
+
+bool WebEngine::create(HWND host, const std::string& initialUrl) {
+    if (!preinitialize()) {
+        return false;
+    }
+    return attach(host, initialUrl);
+}
+
+bool WebEngine::createController() {
+    if (!environment_ || host_ == nullptr || controllerCreationStarted_) {
+        return true;
+    }
+    controllerCreationStarted_ = true;
+
+    const HRESULT hr = environment_->CreateCoreWebView2Controller(
+        host_,
+        Microsoft::WRL::Callback<
+            ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+            [this](HRESULT controllerResult,
+                   ICoreWebView2Controller* controller) -> HRESULT {
+                if (FAILED(controllerResult) || controller == nullptr) {
+                    log::warn("WebView2 controller creation failed");
+                    return controllerResult;
+                }
+
+                controller_ = controller;
+                controller_->get_CoreWebView2(webView_.GetAddressOf());
+                applySettings();
+                applyTheme();
+                registerDownloadHandler();
+
+                RECT bounds{};
+                GetClientRect(host_, &bounds);
+                controller_->put_Bounds(bounds);
+                controller_->put_IsVisible(TRUE);
+
+                // Start the page request before wiring UI-only handlers.
+                if (!pendingUrl_.empty()) {
+                    navigate(pendingUrl_);
+                    pendingUrl_.clear();
+                }
+                registerAccelerators();
+                registerNavigationObserver();
+                return S_OK;
+            }).Get());
+
+    if (FAILED(hr)) {
+        log::warn("Failed to start WebView2 controller creation");
         return false;
     }
     return true;

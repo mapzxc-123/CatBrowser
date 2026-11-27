@@ -20,6 +20,10 @@ namespace astb3ast {
 // so the final artifact is a single .exe (apart from the WebView2 Runtime).
 class WebEngine {
 public:
+    // Start the WebView2 environment before the native window exists so its
+    // process startup overlaps Win32 setup. attach() supplies the host HWND.
+    bool preinitialize();
+    bool attach(HWND host, const std::string& initialUrl);
     bool create(HWND host, const std::string& initialUrl);
 
     void navigate(const std::string& url);
@@ -51,6 +55,7 @@ public:
     }
 
 private:
+    bool createController();
     void applySettings();
     void registerAccelerators();
     void registerNavigationObserver();
@@ -65,6 +70,8 @@ private:
     std::string pendingUrl_;
     std::wstring downloadDir_;
     bool darkTheme_ = true;
+    bool environmentStarted_ = false;
+    bool controllerCreationStarted_ = false;
     bool downloadHandlerRegistered_ = false;
     EventRegistrationToken acceleratorToken_{};
     EventRegistrationToken navigationToken_{};
