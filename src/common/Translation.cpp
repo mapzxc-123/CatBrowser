@@ -139,6 +139,8 @@ constexpr std::pair<const char*, const char*> kEntries[] = {
     {"default", "既定"},
 };
 
+std::vector<Entry> g_userEntries;
+
 std::string jsonEscape(std::string_view value) {
     std::string out;
     out.reserve(value.size() + 4);
@@ -164,13 +166,19 @@ std::string jsonEscape(std::string_view value) {
 
 std::string buildPairs(Direction direction) {
     std::vector<std::pair<std::string, std::string>> pairs;
-    pairs.reserve(std::size(kEntries));
-    for (const auto& entry : kEntries) {
+    pairs.reserve(std::size(kEntries) + g_userEntries.size());
+    auto add = [&](const std::string& english, const std::string& japanese) {
         if (direction == Direction::ToJapanese) {
-            pairs.emplace_back(entry.first, entry.second);
+            pairs.emplace_back(english, japanese);
         } else {
-            pairs.emplace_back(entry.second, entry.first);
+            pairs.emplace_back(japanese, english);
         }
+    };
+    for (const auto& entry : kEntries) {
+        add(entry.first, entry.second);
+    }
+    for (const auto& entry : g_userEntries) {
+        add(entry.first, entry.second);
     }
 
     // Longest keys first so "high score" wins over "score".
@@ -244,6 +252,10 @@ std::string buildTranslateScript(Direction direction) {
 
 std::string buildRestoreScript() {
     return "(function(){if(window.__catbrowserRestore){window.__catbrowserRestore();}})();";
+}
+
+void setUserEntries(std::vector<Entry> entries) {
+    g_userEntries = std::move(entries);
 }
 
 } // namespace catbrowser::translation

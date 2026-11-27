@@ -6,6 +6,7 @@
 #include "../common/UrlUtils.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <shlwapi.h>
 #include <utility>
 
@@ -102,6 +103,9 @@ bool WebEngine::create(HWND host, const std::string& initialUrl) {
                             controller_->get_CoreWebView2(webView_.GetAddressOf());
                             applySettings();
                             registerAccelerators();
+                            registerNavigationObserver();
+                            applyTheme();
+                            registerDownloadHandler();
 
                             RECT bounds{};
                             GetClientRect(host_, &bounds);
@@ -195,6 +199,102 @@ void WebEngine::registerAccelerators() {
         &acceleratorToken_);
 }
 
+void WebEngine::registerNavigationObserver() {
+    if (!webView_) {
+        return;
+    }
+    webView_->add_NavigationCompleted(
+        Microsoft::WRL::Callback<
+            ICoreWebView2NavigationCompletedEventHandler>(
+            [this](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs*) -> HRESULT {
+                BOOL canBack = FALSE;
+                BOOL canForward = FALSE;
+                if (webView_) {
+                    webView_->get_CanGoBack(&canBack);
+                    webView_->get_CanGoForward(&canForward);
+                }
+                if (onNavigationStateChanged_) {
+                    onNavigationStateChanged_(canBack != FALSE, canForward != FALSE);
+                }
+                return S_OK;
+            }).Get(),
+        &navigationToken_);
+}
+
+void WebEngine::registerDownloadHandler() {
+    if (downloadDir_.empty() || downloadHandlerRegistered_ || !webView_) {
+        return;
+    }
+    Microsoft::WRL::ComPtr<ICoreWebView2_4> webView4;
+    if (FAILED(webView_.As(&webView4))) {
+        return;
+    }
+    webView4->add_DownloadStarting(
+        Microsoft::WRL::Callback<ICoreWebView2DownloadStartingEventHandler>(
+            [this](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT {
+                if (args == nullptr || downloadDir_.empty()) {
+                    return S_OK;
+                }
+                LPWSTR suggested = nullptr;
+                if (FAILED(args->get_ResultFilePath(&suggested)) || suggested == nullptr) {
+                    return S_OK;
+                }
+                const std::wstring fileName(PathFindFileNameW(suggested));
+                CoTaskMemFree(suggested);
+                if (fileName.empty()) {
+                    return S_OK;
+                }
+
+                const std::filesystem::path directory(downloadDir_);
+                std::error_code error;
+                std::filesystem::create_directories(directory, error);
+                if (error) {
+                    log::warn("Could not create the configured download directory");
+                    return S_OK;
+                }
+                const std::filesystem::path target = directory / fileName;
+                args->put_ResultFilePath(target.c_str());
+                args->put_Handled(TRUE);
+                return S_OK;
+            }).Get(),
+        &downloadToken_);
+    downloadHandlerRegistered_ = true;
+}
+
+void WebEngine::applyTheme() {
+    if (!webView_) {
+        return;
+    }
+    Microsoft::WRL::ComPtr<ICoreWebView2_13> webView13;
+    if (FAILED(webView_.As(&webView13))) {
+        return;
+    }
+    Microsoft::WRL::ComPtr<ICoreWebView2Profile> profile;
+    if (FAILED(webView13->get_Profile(profile.GetAddressOf()))) {
+        return;
+    }
+    profile->put_PreferredColorScheme(
+        darkTheme_ ? COREWEBVIEW2_PREFERRED_COLOR_SCHEME_DARK
+                   : COREWEBVIEW2_PREFERRED_COLOR_SCHEME_LIGHT);
+}
+
+void WebEngine::setTheme(bool dark) {
+    darkTheme_ = dark;
+    applyTheme();
+}
+
+void WebEngine::setDownloadDirectory(std::wstring directory) {
+    downloadDir_ = std::move(directory);
+    if (!downloadDir_.empty()) {
+        std::error_code error;
+        std::filesystem::create_directories(std::filesystem::path(downloadDir_), error);
+        if (error) {
+            log::warn("Could not create the configured download directory");
+        }
+    }
+    registerDownloadHandler();
+}
+
 void WebEngine::navigate(const std::string& url) {
     const std::string normalized = url::normalize(url);
     if (normalized.empty()) {
@@ -217,6 +317,18 @@ void WebEngine::reload() {
         Microsoft::WRL::Callback<
             ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
             [](HRESULT, LPCWSTR) -> HRESULT { return S_OK; }).Get());
+}
+
+void WebEngine::goBack() {
+    if (webView_) {
+        webView_->GoBack();
+    }
+}
+
+void WebEngine::goForward() {
+    if (webView_) {
+        webView_->GoForward();
+    }
 }
 
 void WebEngine::focus() {

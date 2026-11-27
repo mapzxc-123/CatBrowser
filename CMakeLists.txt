@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(CatBrowser
-    VERSION 1.3.0
+    VERSION 1.4.0
     DESCRIPTION "Ultra-light native URL launcher for browser games"
     LANGUAGES CXX)
 
@@ -50,7 +50,8 @@ set(CATBROWSER_SOURCES
     src/main.cpp
     src/common/Log.cpp
     src/common/UrlUtils.cpp
-    src/common/Translation.cpp)
+    src/common/Translation.cpp
+    src/common/Search.cpp)
 
 # ---------------------------------------------------------------------------
 # Windows: Pure Win32 + WebView2 (static loader, single EXE)
@@ -113,6 +114,7 @@ if(WIN32)
     list(APPEND CATBROWSER_SOURCES
         src/win32/App_win.cpp
         src/win32/PlatformWindow.cpp
+        src/win32/LocalData.cpp
         src/win32/WebEngine.cpp
         src/win32/GpuExports.cpp)
 

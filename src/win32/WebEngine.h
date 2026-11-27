@@ -24,9 +24,15 @@ public:
 
     void navigate(const std::string& url);
     void reload();
+    void goBack();
+    void goForward();
     void focus();
     void resize(int width, int height);
     void setVisible(bool visible);
+
+    // 1.4 settings: light/dark web content and a fixed download directory.
+    void setTheme(bool dark);
+    void setDownloadDirectory(std::wstring directory);
 
     // One-shot, offline page translation. No observers or timers are installed.
     void translate(translation::Direction direction);
@@ -37,10 +43,16 @@ public:
     void setOnFullscreenToggle(std::function<void()> callback) {
         onFullscreenToggle_ = std::move(callback);
     }
+    void setOnNavigationStateChanged(std::function<void(bool canBack, bool canForward)> callback) {
+        onNavigationStateChanged_ = std::move(callback);
+    }
 
 private:
     void applySettings();
     void registerAccelerators();
+    void registerNavigationObserver();
+    void registerDownloadHandler();
+    void applyTheme();
 
     Microsoft::WRL::ComPtr<ICoreWebView2Environment> environment_;
     Microsoft::WRL::ComPtr<ICoreWebView2Controller> controller_;
@@ -48,10 +60,16 @@ private:
 
     HWND host_ = nullptr;
     std::string pendingUrl_;
+    std::wstring downloadDir_;
+    bool darkTheme_ = true;
+    bool downloadHandlerRegistered_ = false;
     EventRegistrationToken acceleratorToken_{};
+    EventRegistrationToken navigationToken_{};
+    EventRegistrationToken downloadToken_{};
 
     std::function<void()> onReload_;
     std::function<void()> onFullscreenToggle_;
+    std::function<void(bool, bool)> onNavigationStateChanged_;
 };
 
 } // namespace catbrowser
