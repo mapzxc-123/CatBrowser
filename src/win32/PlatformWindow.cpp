@@ -190,6 +190,18 @@ bool PlatformWindow::create() {
     }
 
     g_activeWindow = this;
+
+    // WebView2 renders in child HWNDs owned by other processes, so mouse
+    // movement over the page never reaches this window. Raw input is delivered
+    // to our own HWND from the device event, with no polling or timers, which
+    // lets the thin bar hide/reveal even while the pointer is over the page.
+    RAWINPUTDEVICE mouse{};
+    mouse.usUsagePage = 1;   // Generic Desktop Controls
+    mouse.usUsage = 2;       // Mouse
+    mouse.dwFlags = RIDEV_INPUTSINK;
+    mouse.hwndTarget = hwnd_;
+    RegisterRawInputDevices(&mouse, 1, sizeof(mouse));
+
     ShowWindow(hwnd_, SW_SHOW);
     UpdateWindow(hwnd_);
     return true;
@@ -829,6 +841,26 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             break;
         }
 
+        case WM_INPUT: {
+            RAWINPUT raw{};
+            UINT rawSize = sizeof(raw);
+            const UINT copied = GetRawInputData(
+                reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, &raw,
+                &rawSize, sizeof(RAWINPUTHEADER));
+            if (copied == sizeof(raw) && raw.header.dwType == RIM_TYPEMOUSE &&
+                GetForegroundWindow() == hwnd) {
+                POINT point{};
+                if (GetCursorPos(&point) && ScreenToClient(hwnd, &point)) {
+                    if (point.y <= kRevealZone) {
+                        self->revealBar();
+                    } else if (point.y > kBarHeight + kKeepVisibleZone) {
+                        self->maybeAutoHideBar(point.y);
+                    }
+                }
+            }
+            return 0;
+        }
+
         case WM_COMMAND:
             if (HIWORD(wParam) == BN_CLICKED) {
                 switch (LOWORD(wParam)) {
@@ -1000,7 +1032,14 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             break;
         }
 
-        case WM_DESTROY:
+        case WM_DESTROY: {
+            RAWINPUTDEVICE mouse{};
+            mouse.usUsagePage = 1;
+            mouse.usUsage = 2;
+            mouse.dwFlags = RIDEV_REMOVE;
+            mouse.hwndTarget = nullptr;
+            RegisterRawInputDevices(&mouse, 1, sizeof(mouse));
+
             if (self->overlayEdit_ != nullptr &&
                 self->originalEditProc_ != nullptr) {
                 SetWindowLongPtrW(self->overlayEdit_, GWLP_WNDPROC,
@@ -1036,6 +1075,7 @@ LRESULT CALLBACK PlatformWindow::windowProc(HWND hwnd, UINT message,
             }
             PostQuitMessage(0);
             return 0;
+        }
 
         default:
             break;

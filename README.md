@@ -23,6 +23,7 @@ Electron / Tauri / Chromium の自前ビルドは使用しません。
 
 - 上部 24 px のアイコンバー + WebView 領域だけの最小 UI（タブ / ブックマーク / ツールバーなし）
 - バーはマウスが画面上部に近づくと表示され、入力中やオーバーレイ表示中以外は自動的に隠れる
+  - WebView2 の子 HWND は別プロセスなので、マウス位置は Raw Input で受け取る（タイマー／ポーリングなし）
 - 検索入力欄・履歴リストは**呼び出したときだけ作成するオーバーレイ**に集約
 - 常設コントロールは 8 個のアイコンボタンと WebView ホストのみ。テキストラベルは方向表示の `JA` / `EN` だけ
 - 何も操作していないとき（非アクティブ・最小化）は WebView を非表示にして描画処理を停止
@@ -183,7 +184,7 @@ macOS / Linux ジョブはソースごと残していますが、`workflow_dispa
 
 | OS | 設定 |
 |---|---|
-| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止、24px アイコンバーの自動非表示、WebView サイズ変更は状態変化時のみ |
+| Windows | `NvOptimusEnablement` / `AmdPowerXpressRequestHighPerformance` エクスポート、`ABOVE_NORMAL_PRIORITY_CLASS`、GPU 加速に絞った Chromium スイッチを `AdditionalBrowserArguments` で注入、ステータスバー / 右クリック / ズーム / デベロッパーツール / Autofill を無効化、非アクティブ/最小化時は WebView を非表示にして描画停止、24px アイコンバーの自動非表示（Raw Input、タイマーなし）、WebView サイズ変更は状態変化時のみ |
 | macOS | `NSActivityUserInitiated \| NSActivityLatencyCritical` で App Nap 無効、`nonPersistentDataStore`、`WKPreferences` の高速描画系キーを有効化、レイヤーバックトビュー |
 | Linux | `setpriority(PRIO_PROCESS, 0, -10)`、ephemeral `WebKitWebContext`、ハードウェアアクセラレーション有効化 |
 
